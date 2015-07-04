@@ -87,7 +87,7 @@ public class Code extends Attribute implements WithAttributes {
     @Override
     public int getValueSize() {
         int size = SIZE_SHORT + SIZE_SHORT + SIZE_INT + code.length;
-        size += exceptionTable.size() * ExceptionTableEntry.getSize();
+        size += SIZE_SHORT + exceptionTable.size() * ExceptionTableEntry.getSize();
         size += Attribute.getTotalSize(attributes);
         return size;
     }

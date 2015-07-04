@@ -84,7 +84,7 @@ public class InnerClasses extends Attribute {
 
     @Override
     public int getValueSize() {
-        return innerClasses.size() * InnerClassDesc.getSize();
+        return SIZE_SHORT + innerClasses.size() * InnerClassDesc.getSize();
     }
 
     @Override

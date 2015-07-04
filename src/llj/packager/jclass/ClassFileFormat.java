@@ -34,7 +34,7 @@ public class ClassFileFormat implements WithAttributes {
     }
 
 
-    public final byte[] magic = new byte[4];
+    public final byte[] magic = new byte[] {(byte)0xCA, (byte)0xFE, (byte)0xBA, (byte)0xBE};
     public final int minorVersion;
     public final int majorVersion;
     public final ConstantPool constPool;

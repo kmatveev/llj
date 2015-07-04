@@ -69,7 +69,7 @@ public class LocalVariableTable extends Attribute {
 
     @Override
     public int getValueSize() {
-        return variables.size() * LocalVariableDesc.getSize();
+        return SIZE_SHORT + variables.size() * LocalVariableDesc.getSize();
     }
 
     @Override

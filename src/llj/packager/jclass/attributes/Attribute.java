@@ -153,7 +153,7 @@ public abstract class Attribute {
                 totalLength -= SIZE_INT;
 
                 part = "value";
-                if (checkLength && (length > totalLength)) throw new ReadException("Specified attribute length is larger that provided limit");
+                if (checkLength && (length > totalLength)) throw new ReadException("Specified attribute length " + length + " is larger that provided limit " + totalLength);
                 Attribute attrib = AttributeType.getByName(name).readFrom(pool, nameRef, in, length);
                 totalLength -= attrib.getValueSize();
                 attributes.add(attrib);
@@ -167,7 +167,7 @@ public abstract class Attribute {
     public static int getTotalSize(List<Attribute> attributes) {
         int size = SIZE_SHORT;
         for (Attribute attribute : attributes) {
-            size += attribute.getValueSize();
+            size += attribute.getLength();
         }
         return size;
     }
@@ -200,7 +200,7 @@ public abstract class Attribute {
     public int writeTo(WritableByteChannel out) throws IOException {
         int bytesConsumed = 0;
         bytesConsumed += name.writeTo(out);
-        putInt(out, getLength(), ByteOrder.BIG_ENDIAN);
+        putInt(out, getValueSize(), ByteOrder.BIG_ENDIAN);
         bytesConsumed += BinIOTools.SIZE_INT;
         bytesConsumed += writeValueTo(out);
         return bytesConsumed;

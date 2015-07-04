@@ -55,4 +55,12 @@ public class MethodInfo extends ClassMemberInfo {
         return SIZE_SHORT + ConstantRef.getSize() + ConstantRef.getSize() + Attribute.getTotalSize(attributes);
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof MethodInfo) {
+            return super.equals(obj);
+        } else {
+            return false;
+        }
+    }
 }

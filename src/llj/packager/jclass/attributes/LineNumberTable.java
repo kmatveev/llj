@@ -80,7 +80,7 @@ public class LineNumberTable extends Attribute {
 
     @Override
     public int getValueSize() {
-        return lineNumbers.size() * LineNumberDesc.getSize();
+        return SIZE_SHORT + lineNumbers.size() * LineNumberDesc.getSize();
     }
 
     @Override
