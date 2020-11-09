@@ -69,16 +69,6 @@ public class MethodReference extends ClassMemberReference<MethodData> {
             ClassData classData = classRef.get();
             method = classData.getMethod(methodName, paramTypes);
             if (method == null) {
-                ClassReference parentRef = classData.parent;
-                while (parentRef != null && classCache.resolveAndCache(parentRef)) {
-                    ClassData parentClass = parentRef.get();
-                    method = classData.getMethod(methodName, paramTypes);
-                    if (method != null) break;
-                }
-                if (method == null) {
-
-                }
-
                 throw new LinkException("Cannot resolve method. Class " + classData.toString() + " doesn't contain a method with name " + methodName + " and type signature ... ");
             }
             if (!method.returnType.equals(expectedReturnType)) throw new LinkException("Method return type mismatch. Expected: " + expectedReturnType + " , actual: " + method.returnType);

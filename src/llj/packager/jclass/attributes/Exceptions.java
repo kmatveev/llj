@@ -71,7 +71,7 @@ public class Exceptions extends Attribute {
 
     @Override
     public int getValueSize() {
-        return SIZE_SHORT + exceptions.size() * ConstantRef.getSize();
+        return exceptions.size() * ConstantRef.getSize();
     }
 
     @Override

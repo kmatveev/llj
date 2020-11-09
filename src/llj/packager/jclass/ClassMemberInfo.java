@@ -46,7 +46,9 @@ public abstract class ClassMemberInfo implements WithAttributes {
         return bytesConsumed;
     }
 
-    public abstract int getSize();
+    public int getSize() {
+        return SIZE_SHORT + ConstantRef.getSize() + ConstantRef.getSize() + Attribute.getTotalSize(attributes);
+    }
 
     @Override
     public List<Attribute> getAttributes() {
@@ -71,22 +73,5 @@ public abstract class ClassMemberInfo implements WithAttributes {
 
     public boolean matches(String name, String descriptor) throws FormatException {
         return resolveName().equals(name) && resolveDescriptor().equals(descriptor);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof ClassMemberInfo) {
-            try {
-                ClassMemberInfo otherClassMember = (ClassMemberInfo) obj;
-                return this.resolveName().equals(otherClassMember.resolveName())
-                        && this.resolveDescriptor().equals(otherClassMember.resolveDescriptor())
-                        && this.accessFlags.equals(otherClassMember.accessFlags)
-                        && this.attributes.equals(otherClassMember.attributes);
-            } catch (FormatException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            return false;
-        }
     }
 }

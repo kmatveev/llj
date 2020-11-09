@@ -15,6 +15,7 @@ public class MethodStaticInfo {
     private List<ClassData> dependentClasses = new ArrayList<ClassData>();
 
     private MethodStaticInfo(MethodData method) {
+        if (method.isAbstract() || method.isNative()) throw new IllegalArgumentException("No static info for abstract and native methods");
         this.method = method;
         this.instrInfo = new InstructionStaticInfo[method.code.size()];
         for (int i = 0; i < instrInfo.length; i++) {

@@ -1,6 +1,9 @@
 package llj.packager.winpe;
 
+import llj.packager.dosexe.DOSHeader;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class PEVerifier {
@@ -9,17 +12,17 @@ public class PEVerifier {
 
         List<String> errors = new ArrayList<String>();
 
-        if (peFormat.peHeader.SizeOfOptionalHeader != PEFormat.PEOptionalHeader.SIZE) errors.add("peHeader.SizeOfOptionalHeader is not equal to size of optional header");
+        if (peFormat.coffHeader.sizeOfOptionalHeader != COFFOptionalHeaderPE32.SIZE) errors.add("coffHeader.sizeOfOptionalHeader is not equal to size of optional header");
 
-        if (peFormat.peHeader.NumberOfSections != peFormat.sections.size()) errors.add("peHeader.NumberOfSections is not equal to number or sections");
+        if (peFormat.coffHeader.numberOfSections != peFormat.sections.size()) errors.add("coffHeader.numberOfSections is not equal to number or sections");
 
-        if (peFormat.dosHeader.e_magic != PEFormat.DOSHeader.MAGIC) errors.add("dosHeader.Magic has incorrect value");
+        if (!Arrays.equals(peFormat.dosHeader.signature, DOSHeader.MAGIC)) errors.add("dosHeader.signature has incorrect value");
 
-        if (peFormat.peOptionalHeader.Magic != PEFormat.PEOptionalHeader.MAGIC) errors.add("peFormat.peOptionalHeader.Magic has incorrect value");
+        if (peFormat.coffOptionalHeaderPE32.signature != COFFOptionalHeaderPE32.MAGIC) errors.add("peFormat.coffOptionalHeaderPE.signature has incorrect value");
 
 
 
-        // if (peFormat.peOptionalHeader.SizeOfCode
+        // if (peFormat.coffOptionalHeaderPE.sizeOfCode
 
         return errors;
     }

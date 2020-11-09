@@ -74,7 +74,11 @@ public class ConstantRef<E extends Constant> {
         if (pool == null) return false;
         try {
             Constant referent = resolve();
-            return referent.getType() == type;
+            if (referent != null) {
+                return referent.getType() == type;
+            } else {
+                return false;
+            }
         } catch (ResolveException e) {
             return false;
         }

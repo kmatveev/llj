@@ -53,25 +53,27 @@ public class ClassView1 {
 
     private final JFrame window;
 
+    private final List<ClassData> classes = new ArrayList<ClassData>();
+    MapResolver<ClassData, String> cache = new MapResolver<ClassData, String>();
+    private MethodData currentMethod;
+    private final Map<MethodData, MethodStaticInfo> staticInfos = new HashMap<MethodData, MethodStaticInfo>();
+
     private final JTree classMembersTree;
     private final ClassMembersTreeModel classMembersTreeModel;
 
-    private final JTable instructionsTable, localVarsTable;
+    private final JLabel methodData = new JLabel("<no method selected>");
 
+    private final JTable instructionsTable;
     private final MethodTableModel instructionsTableModel;
+
+    private final JTable localVarsTable;
     private final LocalVarsTableModel localVarsTableModel;
     // private final DependentClassesTableModel dependentClassesTableModel;
-    private final JLabel methodData = new JLabel("<no method selected>");
 
     private final JButton addDirToClasspathButton;
     private final List<File> classPathEntries = new ArrayList<File>();
     private final ClasspathTableModel classpathTableModel;
 
-    private final List<ClassData> classes = new ArrayList<ClassData>();
-    MapResolver<ClassData, String> cache = new MapResolver<ClassData, String>();
-    private MethodData currentMethod;
-
-    private final Map<MethodData, MethodStaticInfo> staticInfos = new HashMap<MethodData, MethodStaticInfo>();
 
     public ClassView1() {
 
@@ -142,13 +144,14 @@ public class ClassView1 {
                     addDirToClasspathButton.setAction(new AbstractAction("Add directory") {
                         @Override
                         public void actionPerformed(ActionEvent e) {
-                            JFileChooser dirChooser = new JFileChooser();
-                            dirChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-                            int status = dirChooser.showDialog(window, "Choose");
-                            if (status == JFileChooser.APPROVE_OPTION) {
-                                classPathEntries.add(dirChooser.getSelectedFile());
-                                classpathTableModel.fireTableDataChanged();
-                            }
+                            throw new RuntimeException();
+//                            JFileChooser dirChooser = new JFileChooser();
+//                            dirChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+//                            int status = dirChooser.showDialog(window, "Choose");
+//                            if (status == JFileChooser.APPROVE_OPTION) {
+//                                classPathEntries.add(dirChooser.getSelectedFile());
+//                                classpathTableModel.fireTableDataChanged();
+//                            }
                         }
                     });
                     classPathToolbar.add(addDirToClasspathButton);
@@ -220,6 +223,7 @@ public class ClassView1 {
                             }
                         }
                     });
+
                 }
 
                 {
@@ -299,13 +303,17 @@ public class ClassView1 {
             JTextField stackBeforeField = new JTextField();
             stackBeforeField.setPreferredSize(fieldDimension);
             loadedInfoPanel.add(stackBeforeField);
-            stackBeforeField.setText(currentMethod.loadedStaticInfo.getStackStateBefore(instrIndex));
+            if (currentMethod.loadedStaticInfo != null) {
+                stackBeforeField.setText(currentMethod.loadedStaticInfo.getStackStateBefore(instrIndex));
+            }
 
             loadedInfoPanel.add(new JLabel("Locals", JLabel.RIGHT));
             JTextField localsField = new JTextField();
             localsField.setPreferredSize(fieldDimension);
             loadedInfoPanel.add(localsField);
-            localsField.setText(currentMethod.loadedStaticInfo.getLocalsBefore(instrIndex, false));
+            if (currentMethod.loadedStaticInfo != null) {
+                localsField.setText(currentMethod.loadedStaticInfo.getLocalsBefore(instrIndex, false));
+            }
 
         }
 
@@ -333,8 +341,10 @@ public class ClassView1 {
         classData.linkAll(cache);
 
         for (MethodData method : classData.methods) {
-            MethodStaticInfo staticInfo = MethodStaticInfo.infer(method);
-            staticInfos.put(method, staticInfo);
+            if (!method.isAbstract() && !method.isNative()) {
+                MethodStaticInfo staticInfo = MethodStaticInfo.infer(method);
+                staticInfos.put(method, staticInfo);
+            }
         }
 
         classMembersTreeModel.classAdded(classes.size() - 1);
@@ -373,7 +383,7 @@ public class ClassView1 {
 
         @Override
         public int getRowCount() {
-            return methodData == null ? 0 : methodData.code.size();
+            return methodData == null ? 0 : (methodData.code == null ? 0 : methodData.code.size());
         }
 
         @Override
@@ -393,9 +403,17 @@ public class ClassView1 {
 //                for (MetaData.StateStaticInfo fromItm : methodData.code.get(rowIndex).meta.from)
 //                    fromLines.append(fromItm.jumpedFromOffset).append(",");
 //                return fromLines.toString();
-                return methodData.loadedStaticInfo.getStackStateBefore(rowIndex).length() == 0 ? "" : "*";
+                if (methodData.loadedStaticInfo != null) {
+                    return methodData.loadedStaticInfo.getStackStateBefore(rowIndex).length() == 0 ? "" : "*";
+                } else {
+                    return "";
+                }
             } else if (columnIndex == 3) {
-                return staticInfo.getStackStateAfter(rowIndex);
+                if (staticInfo != null) {
+                    return staticInfo.getStackStateAfter(rowIndex);
+                } else {
+                    return "";
+                }
             } else {
                 return "";
             }

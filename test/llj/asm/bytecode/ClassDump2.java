@@ -16,7 +16,7 @@ public class ClassDump2 {
 
     public static void main(String[] args) {
         try {
-            dump("C:\\projects\\eq-solver\\classes\\CompoundExpression.class");
+            dump("c:\\tools\\rmiviewer\\ShowRMIRegistry.class");
         } catch (Exception e) {
             e.printStackTrace();
         }

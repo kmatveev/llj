@@ -1,8 +1,14 @@
 package llj.packager.jclass.constants;
 
+import llj.util.BinIOTools;
+import llj.util.ReadException;
+
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+
+import static llj.util.BinIOTools.getInt;
 
 public class DoubleConstant<E> extends Constant<E> {
 
@@ -17,13 +23,19 @@ public class DoubleConstant<E> extends Constant<E> {
         return ConstType.DOUBLE;
     }
 
-    public static DoubleConstant readFrom(ReadableByteChannel bb) {
-        throw new UnsupportedOperationException();
+    public static DoubleConstant readFrom(ReadableByteChannel bb) throws ReadException {
+        try {
+            double value =  BinIOTools.getDouble(bb, ByteOrder.BIG_ENDIAN);
+            return new DoubleConstant(value);
+        } catch (ReadException e) {
+            throw new ReadException("Was unable to read DoubleConstant", e);
+        }
     }
 
     @Override
     public int writeTo(WritableByteChannel bb) throws IOException {
-        throw new UnsupportedOperationException();
+        BinIOTools.putDouble(bb, value);
+        return BinIOTools.SIZE_DOUBLE;
     }
 
     @Override

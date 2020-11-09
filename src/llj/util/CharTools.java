@@ -1,6 +1,7 @@
 package llj.util;
 
 import java.nio.CharBuffer;
+import java.nio.charset.Charset;
 
 public class CharTools {
 
@@ -15,5 +16,9 @@ public class CharTools {
         buffer.limit(l);
         buffer.position(np);
         return result;
+    }
+    
+    public static String bytesToAscii(byte[] bytes) {
+        return new String(bytes, Charset.forName("US-ASCII"));
     }
 }

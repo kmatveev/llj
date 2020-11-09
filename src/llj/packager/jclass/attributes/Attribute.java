@@ -200,7 +200,7 @@ public abstract class Attribute {
     public int writeTo(WritableByteChannel out) throws IOException {
         int bytesConsumed = 0;
         bytesConsumed += name.writeTo(out);
-        putInt(out, getValueSize(), ByteOrder.BIG_ENDIAN);
+        putInt(out, getLength(), ByteOrder.BIG_ENDIAN);
         bytesConsumed += BinIOTools.SIZE_INT;
         bytesConsumed += writeValueTo(out);
         return bytesConsumed;

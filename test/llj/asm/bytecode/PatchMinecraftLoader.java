@@ -91,7 +91,7 @@ public class PatchMinecraftLoader {
 
         System.out.println("NameTypePairConstant added to pool at index=" + pairRef.getIndex());
 
-        // create Field ref constant. Re-use this class ref from class definition
+        // create FieldPE32 ref constant. Re-use this class ref from class definition
         FieldRefConstant fieldRefConstant = new FieldRefConstant(classFormat.thisClassRef, pairRef);
         ConstantRef<FieldRefConstant> refToFieldRef = classFormat.constPool.addOrGetExisting(fieldRefConstant);
 

@@ -125,7 +125,11 @@ public class MethodData extends ClassMemberData {
     }
 
     public boolean isAbstract() {
-        return code == null;
+        return isAbstract;
+    }
+
+    public boolean isNative() {
+        return isNative;
     }
 
     public Instruction atByteOffset(int byteOffset) {

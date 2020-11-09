@@ -50,15 +50,4 @@ public class FieldInfo extends ClassMemberInfo {
         }
     }
 
-    public int getSize() {
-        return SIZE_SHORT + ConstantRef.getSize() + ConstantRef.getSize() + Attribute.getTotalSize(attributes);
-    }
-
-    public boolean equals(Object obj) {
-        if (obj instanceof FieldInfo) {
-            return super.equals(obj);
-        } else {
-            return false;
-        }
-    }
 }

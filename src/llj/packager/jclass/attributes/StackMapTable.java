@@ -211,7 +211,7 @@ public class StackMapTable extends Attribute {
                 int offsetDelta = getUnsignedShort(in, ByteOrder.BIG_ENDIAN);
                 return new SameFrameExtended(tag, offsetDelta);
             } catch (ReadException e) {
-                throw new ReadException("Was unable to read " + part + " part of SameLocals1StackItemFrameExtended", e);
+                throw new ReadException("Was unable to read " + part + " part of SameLocals1StackItemFrameExtended");
             }
         }
 
@@ -220,7 +220,7 @@ public class StackMapTable extends Attribute {
             int result = 0;
             putUnsignedByte(out, tag);
             result += SIZE_BYTE;
-            putUnsignedShort(out, offsetDelta, ByteOrder.BIG_ENDIAN);
+            putUnsignedShort(out, offsetDelta);
             result += SIZE_SHORT;
             return result;
         }
@@ -237,7 +237,8 @@ public class StackMapTable extends Attribute {
         public final VerificationTypeInfo stackItemInfo;
 
         public SameLocals1StackItemFrame(short tag, VerificationTypeInfo stackItemInfo) {
-            if (tag < StackMapFrameType.SAME_LOCALS_1_STACK_ITEM.lower || tag > StackMapFrameType.SAME_LOCALS_1_STACK_ITEM.upper) throw new IllegalArgumentException("Illegal tag:" + tag);
+            // disable this check because this constructor may be called from sub-classes which have different tags
+            // if (tag < StackMapFrameType.SAME_LOCALS_1_STACK_ITEM.lower || tag > StackMapFrameType.SAME_LOCALS_1_STACK_ITEM.upper) throw new IllegalArgumentException("Illegal tag:" + tag);
             this.tag = tag;
             this.stackItemInfo = stackItemInfo;
         }
@@ -264,7 +265,7 @@ public class StackMapTable extends Attribute {
                 VerificationTypeInfo stackItemInfo = VerificationTypeInfo.readFrom(pool, in, length);
                 return new SameLocals1StackItemFrame(tag, stackItemInfo);
             } catch (ReadException e) {
-                throw new ReadException("Was unable to read " + part + " part of SameLocals1StackItemFrame", e);
+                throw new ReadException("Was unable to read " + part + " part of SameLocals1StackItemFrame");
             }
         }
 
@@ -313,7 +314,7 @@ public class StackMapTable extends Attribute {
                 VerificationTypeInfo stackItemInfo = VerificationTypeInfo.readFrom(pool, in, length);
                 return new SameLocals1StackItemFrameExtended(tag, stackItemInfo, offsetDelta);
             } catch (ReadException e) {
-                throw new ReadException("Was unable to read " + part + " part of SameLocals1StackItemFrameExtended", e);
+                throw new ReadException("Was unable to read " + part + " part of SameLocals1StackItemFrameExtended");
             }
         }
 
@@ -322,7 +323,7 @@ public class StackMapTable extends Attribute {
             int result = 0;
             putUnsignedByte(out, tag);
             result += SIZE_BYTE;
-            putUnsignedShort(out, offsetDelta, ByteOrder.BIG_ENDIAN);
+            putUnsignedShort(out, offsetDelta);
             result += SIZE_SHORT;
             result += stackItemInfo.writeTo(out);
             return result;
@@ -365,7 +366,7 @@ public class StackMapTable extends Attribute {
             int result = 0;
             putUnsignedByte(out, tag);
             result += SIZE_BYTE;
-            putUnsignedShort(out, offsetDelta, ByteOrder.BIG_ENDIAN);
+            putUnsignedShort(out, offsetDelta);
             result += SIZE_SHORT;
             return result;
         }
@@ -388,7 +389,7 @@ public class StackMapTable extends Attribute {
                 length -= SIZE_SHORT;
                 return new ChopFrame(tag, offsetDelta);
             } catch (ReadException e) {
-                throw new ReadException("Was unable to read " + part + " part of ChopFrame", e);
+                throw new ReadException("Was unable to read " + part + " part of ChopFrame");
             }
         }
 
@@ -432,7 +433,7 @@ public class StackMapTable extends Attribute {
             int result = 0;
             putUnsignedByte(out, tag);
             result += SIZE_BYTE;
-            putUnsignedShort(out, offsetDelta, ByteOrder.BIG_ENDIAN);
+            putUnsignedShort(out, offsetDelta);
             result += SIZE_SHORT;
             for (VerificationTypeInfo typeInfo : appends) {
                 result += typeInfo.writeTo(out);
@@ -457,7 +458,7 @@ public class StackMapTable extends Attribute {
                 }
                 return new AppendFrame(tag, offsetDelta, appends);
             } catch (ReadException e) {
-                throw new ReadException("Was unable to read " + part + " part of AppendFrame", e);
+                throw new ReadException("Was unable to read " + part + " part of AppendFrame");
             }
         }
 
@@ -508,14 +509,14 @@ public class StackMapTable extends Attribute {
             int result = 0;
             putUnsignedByte(out, (short)StackMapFrameType.FULL_FRAME.lower);
             result += SIZE_BYTE;
-            putUnsignedShort(out, offsetDelta, ByteOrder.BIG_ENDIAN);
+            putUnsignedShort(out, offsetDelta);
             result += SIZE_SHORT;
-            putUnsignedShort(out, locals.length, ByteOrder.BIG_ENDIAN);
+            putUnsignedShort(out, locals.length);
             result += SIZE_SHORT;
             for (VerificationTypeInfo typeInfo : locals) {
                 result += typeInfo.writeTo(out);
             }
-            putUnsignedShort(out, stackItems.length, ByteOrder.BIG_ENDIAN);
+            putUnsignedShort(out, stackItems.length);
             result += SIZE_SHORT;
             for (VerificationTypeInfo typeInfo : stackItems) {
                 result += typeInfo.writeTo(out);
@@ -558,7 +559,7 @@ public class StackMapTable extends Attribute {
                 }
                 return new FullFrame(offsetDelta, locals, stackItems);
             } catch (ReadException e) {
-                throw new ReadException("Was unable to read " + part + " part of FullFrame", e);
+                throw new ReadException("Was unable to read " + part + " part of FullFrame");
             }
         }
 
@@ -615,7 +616,7 @@ public class StackMapTable extends Attribute {
                     default: throw new RuntimeException();
                 }
             } catch (IllegalArgumentException e) {
-                throw new ReadException("Was unable to read " + part + " part of LocalVariableDesc", e);
+                throw new ReadException("Was unable to read " + part + " part of LocalVariableDesc");
             }
 
         }
@@ -745,7 +746,7 @@ public class StackMapTable extends Attribute {
         @Override
         public int writeTo(WritableByteChannel out) throws IOException {
             int result = super.writeTo(out);
-            putUnsignedShort(out, offset, ByteOrder.BIG_ENDIAN);
+            putUnsignedShort(out, offset);
             result += SIZE_SHORT;
             return result;
         }

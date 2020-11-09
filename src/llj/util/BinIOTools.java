@@ -8,7 +8,7 @@ import java.nio.channels.WritableByteChannel;
 
 public class BinIOTools {
 
-    public static final int SIZE_BYTE = 1, SIZE_CHAR = 1, SIZE_SHORT = 2, SIZE_INT = 4, SIZE_LONG = 8;
+    public static final int SIZE_BYTE = 1, SIZE_CHAR = 1, SIZE_SHORT = 2, SIZE_INT = 4, SIZE_LONG = 8, SIZE_DOUBLE = 8;
 
     static ThreadLocal<ByteBuffer> tempBuffer = new ThreadLocal<ByteBuffer>() {
         @Override
@@ -103,8 +103,8 @@ public class BinIOTools {
     }
 
     public static long getUnsignedInt(ByteBuffer readBuffer) {
-        long l = readBuffer.getInt();
-        return l & 0xFFFFFFFF;
+        int l = readBuffer.getInt();
+        return l & 0xFFFFFFFFL;
     }
 
     public static int getInt(ReadableByteChannel readChannel, ByteOrder order) throws ReadException {
@@ -131,6 +131,19 @@ public class BinIOTools {
 
     public static long getLong(ByteBuffer readBuffer) {
         return readBuffer.getLong();
+    }
+
+    public static double getDouble(ReadableByteChannel readChannel, ByteOrder order) throws ReadException {
+        ByteBuffer readBuffer = tempBuffer.get();
+        readBuffer.order(order);
+        readBuffer.limit(8);
+        readFully(readChannel, readBuffer);
+        readBuffer.flip();
+        return getDouble(readBuffer);
+    }
+
+    public static double getDouble(ByteBuffer readBuffer) {
+        return readBuffer.getDouble();
     }
 
     public static void putUnsignedByte(ByteBuffer readBuffer, short value) {
@@ -225,13 +238,32 @@ public class BinIOTools {
         writeChannel.write(bb);
     }
 
+    public static void putDouble(ByteBuffer writeBuffer, double value) {
+        writeBuffer.putDouble(value);
+    }
 
-    public static boolean readIntoBuffer(ReadableByteChannel in, ByteBuffer readBuffer, int size) throws Exception {
+    public static void putDouble(WritableByteChannel writeChannel, double value) throws IOException {
+        putDouble(writeChannel, value, ByteOrder.nativeOrder());
+    }
+
+    public static void putDouble(WritableByteChannel writeChannel, double value, ByteOrder order) throws IOException {
+        ByteBuffer bb = tempBuffer.get();
+        bb.clear();
+        bb.order(order);
+        putDouble(bb, value);
+        bb.flip();
+        writeChannel.write(bb);
+    }
+
+
+    public static boolean readIntoBuffer(ReadableByteChannel in, ByteBuffer readBuffer, int size) throws IOException {
         readBuffer.clear();
-        readBuffer.limit(size);
-        while (in.read(readBuffer) > 0);  // TODO need a better way
-        if (readBuffer.hasRemaining()) return false;
+        if (size >= 0 && size < readBuffer.capacity()) {
+            readBuffer.limit(size);
+        }
+        while (readBuffer.hasRemaining() && (in.read(readBuffer) >= 0));  // TODO need a better way to avoid spinning on non-blocking input channel
+        boolean hasRemaining = readBuffer.hasRemaining();
         readBuffer.flip();
-        return true;
+        return hasRemaining;
     }
 }

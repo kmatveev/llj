@@ -34,7 +34,7 @@ public class ClassFileFormat implements WithAttributes {
     }
 
 
-    public final byte[] magic = new byte[] {(byte)0xCA, (byte)0xFE, (byte)0xBA, (byte)0xBE};
+    public final byte[] magic = new byte[4];
     public final int minorVersion;
     public final int majorVersion;
     public final ConstantPool constPool;
@@ -204,7 +204,7 @@ public class ClassFileFormat implements WithAttributes {
             errors.add("Reference to this class is invalid");
         }
 
-        if (!parentClassRef.isValid(Constant.ConstType.CLASS_REF)) {
+        if (!parentClassRef.isNullRef() && !parentClassRef.isValid(Constant.ConstType.CLASS_REF)) {
             errors.add("Reference to parent class is invalid");
         }
 

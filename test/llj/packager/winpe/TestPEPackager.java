@@ -1,5 +1,8 @@
 package llj.packager.winpe;
 
+import llj.packager.coff.Section;
+import llj.packager.coff.SectionHeader;
+
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.FileSystems;
@@ -30,11 +33,11 @@ public class TestPEPackager {
         PEFormat peFormat = new PEFormat();
         peFormat.readFrom(fileChannel);
 
-        System.out.println(peFormat.peOptionalHeader.Magic + ", Should be: " + 267);
-        List<PEFormat.SectionHeader> sections = peFormat.sections;
+        System.out.println(peFormat.coffOptionalHeaderPE32.signature + ", Should be: " + 267);
+        List<Section> sections = peFormat.sections;
         System.out.println(sections.size() + ", Should be: " + 3);
-        for (PEFormat.SectionHeader sectionHeader : sections) {
-            System.out.println(new String(sectionHeader.Name));
+        for (Section section : sections) {
+            System.out.println(new String(section.sectionHeader.name.name));
         }
 
         List<String> verificationErrors = PEVerifier.validate(peFormat);
@@ -46,8 +49,8 @@ public class TestPEPackager {
         PEFormat peFormat = new PEFormat();
 
         ByteBuffer bb = ByteBuffer.allocate(500);
-        peFormat.peOptionalHeader.writeTo(bb);
-        if (bb.position() != PEFormat.PEOptionalHeader.SIZE) throw new RuntimeException("Optional header size is wrong");
+        peFormat.coffOptionalHeaderPE32.writeTo(bb);
+        if (bb.position() != COFFOptionalHeaderPE32.SIZE) throw new RuntimeException("Optional header size is wrong");
 
     }
 
