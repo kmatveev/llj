@@ -1,6 +1,7 @@
 package llj.packager.winpe;
 
 import llj.packager.DisplayFormat;
+import llj.packager.FieldSequenceFormat;
 import llj.packager.coff.COFFOptionalHeaderStandard;
 
 import java.io.IOException;
@@ -9,6 +10,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,7 +25,7 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
     public static final int SIZE = COFFOptionalHeaderStandard.SIZE + 200;
     public static final int MAGIC = 0x010b;
 
-    public static enum FieldPE32 {
+    public static enum FieldPE32 implements FieldSequenceFormat.Field<COFFOptionalHeaderPE32> {
 
         BASE_OF_DATA {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -34,6 +37,11 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.baseOfData, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         IMAGE_BASE {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -45,6 +53,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.imageBase, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         SECTION_ALIGNMENT {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -55,6 +69,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
                 putUnsignedInt(dest, source.sectionAlignment);
             }
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.sectionAlignment, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         FILE_ALIGNMENT {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -65,6 +85,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
                 putUnsignedInt(dest, source.fileAlignment);
             }
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.fileAlignment, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         MAJOR_OS_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -75,6 +101,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
                 putUnsignedShort(dest, source.majorOperatingSystemVersion);
             }
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.majorOperatingSystemVersion, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         MINOR_OS_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -82,9 +114,15 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public void write(COFFOptionalHeaderPE32 source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.majorOperatingSystemVersion);
+                putUnsignedShort(dest, source.minorOperatingSystemVersion);
             }
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.minorOperatingSystemVersion, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         MAJOR_IMAGE_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -95,6 +133,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.majorImageVersion, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         MINOR_IMAGE_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -106,6 +150,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.minorImageVersion, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         MAJOR_SUBSYSTEM_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -117,6 +167,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.majorSubsystemVersion, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         MINOR_SUBSYSTEM_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -128,6 +184,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.minorSubsystemVersion, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         RESERVED1 {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -139,6 +201,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.reserved1, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+                        
         },
         SIZE_OF_IMAGE {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -150,6 +218,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.sizeOfImage, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         SIZE_OF_HEADERS {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -161,6 +235,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.sizeOfHeaders, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         CHECKSUM {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -170,6 +250,17 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             public void write(COFFOptionalHeaderPE32 source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.checkSum);
             }
+
+            @Override
+            public int size() { 
+                return DWORD;
+            }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.checkSum, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         SUBSYSTEM {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -181,6 +272,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.subsystem, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         DLL_CHARACTERISTICS {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -192,6 +289,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.subsystem, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         SIZE_OF_STACK_RESERVE {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -203,6 +306,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.sizeOfStackReserve, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         SIZE_OF_STACK_COMMIT {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -214,6 +323,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.sizeOfStackCommit, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         SIZE_OF_HEAP_RESERVE {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -225,6 +340,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.sizeOfHeapReserve, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         SIZE_OF_HEAP_COMMIT {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -236,6 +357,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.sizeOfHeapCommit, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         LOADER_FLAGS {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -247,6 +374,12 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.loaderFlags, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         NUMBER_OF_RVA_AND_SIZES {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
@@ -258,12 +391,19 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.numberOfRvaAndSizes, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         DATA_DIRECTORY {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32 dest) {
 
                 for (int i = 0; i < dest.numberOfRvaAndSizes; i++) {
                     DirectoryEntry entry = new DirectoryEntry();
+                    entry.name = PEFormat.directoryNameByIndex(i);
                     entry.readFrom(source);
                     dest.dataDirectory.add(entry);
                 }
@@ -276,11 +416,20 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
 
             public int size() { return 0; }
+
+            @Override
+            public Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat) {
+                return Optional.of("Data directory");
+            }
         };
+        
+        public abstract int size();
 
         public abstract void read(ByteBuffer source, COFFOptionalHeaderPE32 dest);
 
         public abstract void write(COFFOptionalHeaderPE32 source, ByteBuffer dest);
+
+        public abstract Optional<String> getStringValue(COFFOptionalHeaderPE32 format, DisplayFormat displayFormat);
 
     }
 
@@ -346,7 +495,11 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
         }
         
         return coffOptionalHeaderPE32;
-    } 
+    }
+
+    public Collection<FieldPE32> getExtensionFields() {
+        return Arrays.asList(FieldPE32.values());
+    }
 
     public Location readFrom(ReadableByteChannel in, ByteBuffer readBuffer) throws IOException {
         return readFrom(in, readBuffer, SIZE);
@@ -365,70 +518,55 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
         return null;
     }
 
+    @Override
     public Optional<String> getStringValue(String fieldName, DisplayFormat displayFormat) {
         for (FieldPE32 field: FieldPE32.values()) {
             if (field.name().equals(fieldName)) {
                 return getStringValue(field, displayFormat);
             }
         }
-        return super.getStringValue(fieldName, displayFormat);
+
+        if (fieldName.equals(Field.SIGNATURE.name())) {
+            return getStringValue(Field.SIGNATURE, displayFormat);
+        } else {
+            return super.getStringValue(fieldName, displayFormat);
+        }
+    }
+
+    @Override
+    public Optional<String> getStringValue(Field field, DisplayFormat displayFormat) {
+        if (field == Field.SIGNATURE) {
+            if (displayFormat == DisplayFormat.DEFAULT) {
+                if (signature == MAGIC) {
+                    return Optional.of("PE32");
+                } else {
+                    return Optional.of(String.valueOf(signature) + " (doesn't match PE32 format)");
+                }
+            } else {
+                return super.getStringValue(field, displayFormat);
+            }
+        } else {
+            return super.getStringValue(field, displayFormat);
+        }
+
+    }
+
+    @Override
+    public Optional<String> getStringValue(FieldSequenceFormat.Field field, DisplayFormat displayFormat) {
+        if (field instanceof FieldPE32) {
+            return getStringValue((FieldPE32)field, displayFormat);
+        } else {
+            return super.getStringValue(field, displayFormat);
+        }
     }
 
     public Optional<String> getStringValue(FieldPE32 field, DisplayFormat displayFormat) {
-        switch(field) {
-            case BASE_OF_DATA:
-                return Optional.of(String.valueOf(baseOfData));
-            case IMAGE_BASE:
-                return Optional.of(String.valueOf(imageBase));
-            case SECTION_ALIGNMENT:
-                return Optional.of(String.valueOf(sectionAlignment));
-            case FILE_ALIGNMENT:
-                return Optional.of(String.valueOf(fileAlignment));
-            case MAJOR_OS_VERSION:
-                return Optional.of(String.valueOf(majorOperatingSystemVersion));
-            case MINOR_OS_VERSION:
-                return Optional.of(String.valueOf(minorOperatingSystemVersion));
-            case MAJOR_IMAGE_VERSION:
-                return Optional.of(String.valueOf(majorImageVersion));
-            case MINOR_IMAGE_VERSION:
-                return Optional.of(String.valueOf(minorImageVersion));
-            case MAJOR_SUBSYSTEM_VERSION:
-                return Optional.of(String.valueOf(majorSubsystemVersion));
-            case MINOR_SUBSYSTEM_VERSION:
-                return Optional.of(String.valueOf(minorSubsystemVersion));
-            case RESERVED1:
-                return Optional.of(String.valueOf(reserved1));
-            case SIZE_OF_IMAGE:
-                return Optional.of(String.valueOf(sizeOfImage));
-            case SIZE_OF_HEADERS:
-                return Optional.of(String.valueOf(sizeOfHeaders));
-            case CHECKSUM:
-                return Optional.of(String.valueOf(checkSum));
-            case SUBSYSTEM:
-                return Optional.of(String.valueOf(subsystem));
-            case DLL_CHARACTERISTICS:
-                return Optional.of(String.valueOf(dllCharacteristics));
-            case SIZE_OF_STACK_RESERVE:
-                return Optional.of(String.valueOf(sizeOfStackReserve));
-            case SIZE_OF_STACK_COMMIT:
-                return Optional.of(String.valueOf(sizeOfStackCommit));
-            case SIZE_OF_HEAP_RESERVE:
-                return Optional.of(String.valueOf(sizeOfHeapReserve));
-            case SIZE_OF_HEAP_COMMIT:
-                return Optional.of(String.valueOf(sizeOfHeapCommit));
-            case LOADER_FLAGS:
-                return Optional.of(String.valueOf(loaderFlags));
-            case NUMBER_OF_RVA_AND_SIZES:
-                return Optional.of(String.valueOf(numberOfRvaAndSizes));
-            case DATA_DIRECTORY:
-                return Optional.of("Data directory");
-            default:
-                throw new IllegalArgumentException();
-        }
+        return field.getStringValue(this, displayFormat);
     }
-    
 
-    public void writeTo(ByteBuffer writeBuffer) {
+    @Override
+    public void writeExtensionsTo(ByteBuffer writeBuffer) {
+        writeBuffer.order(ByteOrder.LITTLE_ENDIAN);
         for (FieldPE32 field : FieldPE32.values()) {
             field.write(this, writeBuffer);
         }
@@ -455,7 +593,7 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
 
     @Override
     public int getSize(String fieldName) {
-        for (COFFOptionalHeaderPE32.Field field: COFFOptionalHeaderPE32.Field.values()) {
+        for (COFFOptionalHeaderPE32.FieldPE32 field: COFFOptionalHeaderPE32.FieldPE32.values()) {
             if (field.name().equals(fieldName)) {
                 return field.size();
             }
@@ -466,7 +604,7 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
     @Override
     public int getOffset(String fieldName) {
         int offset = COFFOptionalHeaderStandard.SIZE;
-        for (COFFOptionalHeaderPE32.Field field: COFFOptionalHeaderPE32.Field.values()) {
+        for (COFFOptionalHeaderPE32.FieldPE32 field: COFFOptionalHeaderPE32.FieldPE32.values()) {
             if (field.name().equals(fieldName)) {
                 return offset;
             } else {
@@ -474,5 +612,10 @@ public class COFFOptionalHeaderPE32 extends COFFOptionalHeaderStandard<COFFOptio
             }
         }
         return super.getOffset(fieldName);
+    }
+
+    @Override
+    public void setStringValue(String fieldName, DisplayFormat format) {
+        throw new UnsupportedOperationException();
     }
 }

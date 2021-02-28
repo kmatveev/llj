@@ -46,7 +46,9 @@ public class GridBagByRowAdder {
         gbc.weightx = 1.0;
         gbc.weighty = 0.0;
         
-        gbc.insets = insets;
+        if (insets != null) {
+            gbc.insets = insets;
+        }
         
         parent.add(component, gbc);
 

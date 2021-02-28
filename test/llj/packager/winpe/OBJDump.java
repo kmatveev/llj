@@ -18,7 +18,7 @@ public class OBJDump {
 
     public static void main(String[] args) {
         try {
-            dump("c:\\users\\matvkon\\appdata\\local\\projects\\research\\windows-master\\masm-tests\\assume\\test2.obj");
+            dump("c:\\users\\matvkon\\appdata\\local\\projects\\my-projects\\windows-master\\masm-tests\\assume\\test2.obj");
             // dump("c:\\windows\\system.ini");
         } catch (Exception e) {
             e.printStackTrace();

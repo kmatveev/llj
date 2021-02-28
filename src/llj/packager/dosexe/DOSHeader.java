@@ -1,6 +1,7 @@
 package llj.packager.dosexe;
 
 import llj.packager.DisplayFormat;
+import llj.packager.FieldSequenceFormat;
 import llj.packager.Format;
 import llj.packager.IntrospectableFormat;
 import llj.packager.RawFormat;
@@ -13,11 +14,25 @@ import java.nio.ByteOrder;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
+import static llj.packager.dosexe.DOSHeader.Field.CHECKSUM;
+import static llj.packager.dosexe.DOSHeader.Field.CS;
+import static llj.packager.dosexe.DOSHeader.Field.HEADER_SIZE;
+import static llj.packager.dosexe.DOSHeader.Field.IP;
+import static llj.packager.dosexe.DOSHeader.Field.LAST_SIZE;
+import static llj.packager.dosexe.DOSHeader.Field.MAX_ALLOC;
+import static llj.packager.dosexe.DOSHeader.Field.MIN_ALLOC;
+import static llj.packager.dosexe.DOSHeader.Field.NBLOCKS;
+import static llj.packager.dosexe.DOSHeader.Field.NOVERLAY;
+import static llj.packager.dosexe.DOSHeader.Field.NRELOCS;
+import static llj.packager.dosexe.DOSHeader.Field.RELOC_POS;
+import static llj.packager.dosexe.DOSHeader.Field.SP;
+import static llj.packager.dosexe.DOSHeader.Field.SS;
 import static llj.util.BinIOTools.getUnsignedInt;
 import static llj.util.BinIOTools.getUnsignedShort;
 import static llj.util.BinIOTools.putUnsignedInt;
@@ -32,14 +47,14 @@ import static llj.util.BinIOTools.readIntoBuffer;
  * 4. Free space, from end of relocations till end of DOS header, which is defined by header_size field
  *
  */
-public class DOSHeader<T> implements IntrospectableFormat {
+public class DOSHeader<T> extends FieldSequenceFormat {
 
     public static final int FIXED_HEADER_SIZE = 28;
     public static final int EXTENSION_EXPECTED_SIZE = 100; // just a number of bytes which we expect extension will occupy.
     public static final int RELOCATIONS_EXPECTED_SIZE = 100; // just a number of bytes which we expect extension will occupy.
     
     public static final byte[] MAGIC = new byte[] {0x4D, 0x5A};
-
+    
     public static final String RELOCATIONS = "RELOCATIONS";
     public static final String EXTENSION = "EXTENSION";
 
@@ -48,7 +63,7 @@ public class DOSHeader<T> implements IntrospectableFormat {
         return "DOSHeader";
     }
 
-    public static enum Field {
+    public static enum Field implements FieldSequenceFormat.Field<DOSHeader> {
         SIGNATURE {
             public int size() {
                 return WORD;
@@ -60,6 +75,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
             public void write(DOSHeader source, ByteBuffer dest) {
                 dest.put(source.signature);
+            }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getBytesString(displayFormat, format.signature);
             }
         },
         LAST_SIZE {
@@ -75,6 +95,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.lastSize);
             }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.lastSize, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         NBLOCKS {
 
@@ -88,6 +113,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.nBlocks);
+            }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.nBlocks, size(), ByteOrder.LITTLE_ENDIAN);
             }
         },
         NRELOCS {
@@ -103,6 +133,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.nRelocs);
             }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.nRelocs, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         HEADER_SIZE {
 
@@ -116,6 +151,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.headerSize);
+            }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.headerSize, size(), ByteOrder.LITTLE_ENDIAN);
             }
         },
         MIN_ALLOC {
@@ -131,6 +171,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.minalloc);
             }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.minalloc, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         MAX_ALLOC {
 
@@ -144,6 +189,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.maxalloc);
+            }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.maxalloc, size(), ByteOrder.LITTLE_ENDIAN);
             }
         },
         SS {
@@ -159,6 +209,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.ss);
             }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.ss, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         SP {
 
@@ -172,6 +227,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.sp);
+            }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.sp, size(), ByteOrder.LITTLE_ENDIAN);
             }
         },
         CHECKSUM {
@@ -187,6 +247,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.checksum);
             }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.checksum, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         IP {
 
@@ -200,6 +265,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.ip);
+            }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.ip, size(), ByteOrder.LITTLE_ENDIAN);
             }
         },
         CS {
@@ -215,6 +285,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.cs);
             }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.cs, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         RELOC_POS {
 
@@ -229,6 +304,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.relocPos);
             }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.relocPos, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         NOVERLAY {
 
@@ -242,6 +322,11 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
             public void write(DOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.nOverlay);
+            }
+
+            @Override
+            public Optional<String> getStringValue(DOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.nOverlay, size(), ByteOrder.LITTLE_ENDIAN);
             }
         };
 
@@ -295,7 +380,8 @@ public class DOSHeader<T> implements IntrospectableFormat {
     public int ip;                // Initial IP value
     public int cs;                // Initial (relative) CS value
     public int relocPos;          // File address of relocation table. It should be 64 for PE files
-    public int nOverlay;          // Overlay number
+    public int nOverlay;          // Overlay number    public int minalloc;          // Minimum extra paragraphs needed
+
     public Format headerExtension;
     public long[] relocations;
 
@@ -303,13 +389,15 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
     @Override
     public List<String> getNames() {
-        List<String> result = new ArrayList<String>();
-        for (Field field: Field.values()) {
-            result.add(field.name());
-        }
+        List<String> result = super.getNames();
         result.addAll(getExtensionNames());
         result.add(RELOCATIONS);
         return result;
+    }
+
+    @Override
+    public Collection<Field> fields() {
+        return Arrays.asList(Field.values());
     }
 
     public List<String> getExtensionNames() {
@@ -318,57 +406,31 @@ public class DOSHeader<T> implements IntrospectableFormat {
 
     @Override
     public Optional<String> getStringValue(String fieldName, DisplayFormat displayFormat) {
-        for (Field field: Field.values()) {
-            if (field.name().equals(fieldName)) {
-                return getStringValue(field, displayFormat);
-            }
-        }
         if (fieldName.equals(RELOCATIONS)) {
             return Optional.of(Arrays.toString(relocations));
         } else if (fieldName.equals(EXTENSION)) {
             return Optional.of(headerExtension.getStringValue());
         } else {
-            throw new IllegalArgumentException(fieldName);
+            return super.getStringValue(fieldName, displayFormat);
         }
     }
 
     public Optional<String> getStringValue(Field field, DisplayFormat displayFormat) {
-        switch(field) {
-            case SIGNATURE: {
-                return DisplayFormat.getBytesString(displayFormat, signature);
-            }
-            case LAST_SIZE: return DisplayFormat.getIntegerString(displayFormat, lastSize);
-            case NBLOCKS: return DisplayFormat.getIntegerString(displayFormat, nBlocks);
-            case NRELOCS: return DisplayFormat.getIntegerString(displayFormat, nRelocs);
-            case HEADER_SIZE: return DisplayFormat.getIntegerString(displayFormat, headerSize);
-            case MIN_ALLOC: return DisplayFormat.getIntegerString(displayFormat, minalloc);
-            case MAX_ALLOC: return DisplayFormat.getIntegerString(displayFormat, maxalloc);
-            case SS: return DisplayFormat.getIntegerString(displayFormat, ss);
-            case SP: return DisplayFormat.getIntegerString(displayFormat, sp);
-            case CHECKSUM: return DisplayFormat.getIntegerString(displayFormat, checksum);
-            case IP: return DisplayFormat.getIntegerString(displayFormat, ip);
-            case CS: return DisplayFormat.getIntegerString(displayFormat, cs);
-            case RELOC_POS: return DisplayFormat.getIntegerString(displayFormat, relocPos);
-            case NOVERLAY: return DisplayFormat.getIntegerString(displayFormat, nOverlay);
-            default: throw new IllegalArgumentException(field.toString());
-        }
+        return field.getStringValue(this, displayFormat);
     }
 
+    @Override
     public int getSize(String fieldName) {
-        for (Field field: Field.values()) {
-            if (field.name().equals(fieldName)) {
-                return field.size();
-            }
-        }
         if (fieldName.equals(RELOCATIONS)) {
             return getRelocationsSize();
         } else if (fieldName.equals(EXTENSION)) {
             return getHeaderExtensionsSize();
         } else {
-            throw new IllegalArgumentException(fieldName);
+            return super.getSize(fieldName);
         }
     }
 
+    @Override
     public int getOffset(String fieldName) {
         int offset = 0;
         for (Field field: Field.values()) {
@@ -414,10 +476,10 @@ public class DOSHeader<T> implements IntrospectableFormat {
     }
 
     /**
-     * Tries to read fields sequentially, and returns FieldPE32 which it was unable to read, or null if all Fields have been successfully read
+     * Tries to read fields sequentially, and returns Field which it was unable to read, or null if all Fields have been successfully read
      *
      * @param readBuffer
-     * @return last FieldPE32 which was not read, null if all Fields have been read
+     * @return last Field which was not read, null if all Fields have been read
      */
     public Location readFrom(ByteBuffer readBuffer) {
         int pos = readBuffer.position();
@@ -549,7 +611,7 @@ public class DOSHeader<T> implements IntrospectableFormat {
             writeBuffer.put((byte)0);
         }
     }
-
+    
     public void writeFieldsTo(ByteBuffer writeBuffer, Iterator<Field> fields) {
         while (fields.hasNext()) {
             Field field = fields.next();
@@ -592,5 +654,13 @@ public class DOSHeader<T> implements IntrospectableFormat {
         nRelocs = relocations.length;
     }
 
+    @Override
+    public boolean isDisplayFormatSupported(String fieldName, DisplayFormat format) {
+        return false;
+    }
 
+    @Override
+    public void setStringValue(String fieldName, DisplayFormat format) {
+        throw new UnsupportedOperationException();
+    }
 }

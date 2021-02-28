@@ -1,6 +1,7 @@
 package llj.packager.winpe;
 
 import llj.packager.DisplayFormat;
+import llj.packager.FieldSequenceFormat;
 import llj.packager.Format;
 import llj.packager.dosexe.DOSExeFormat;
 import llj.packager.dosexe.DOSHeader;
@@ -23,7 +24,7 @@ public class ExtendedDOSHeader extends DOSHeader<ExtendedDOSHeader.ExtensionFiel
 
     public static final int HEADER_EXTENSION_MIN_SIZE = 36;
 
-    public static enum ExtensionField {
+    public static enum ExtensionField implements FieldSequenceFormat.Field<ExtendedDOSHeader> {
 
         RES1 {
             @Override
@@ -40,6 +41,11 @@ public class ExtendedDOSHeader extends DOSHeader<ExtendedDOSHeader.ExtensionFiel
                 for (int i = 0; i < source.res1.length; i++)
                     putUnsignedShort(dest, source.res1[i]);
             }
+
+            @Override
+            public Optional<String> getStringValue(ExtendedDOSHeader format, DisplayFormat displayFormat) {
+                return Optional.of(Arrays.toString(format.res1));
+            }
         },
         OEMID {
             @Override
@@ -54,6 +60,11 @@ public class ExtendedDOSHeader extends DOSHeader<ExtendedDOSHeader.ExtensionFiel
             public void write(ExtendedDOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.oemid);
             }
+
+            @Override
+            public Optional<String> getStringValue(ExtendedDOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.oemid, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         OEMINFO {
             public int size() {
@@ -66,6 +77,11 @@ public class ExtendedDOSHeader extends DOSHeader<ExtendedDOSHeader.ExtensionFiel
 
             public void write(ExtendedDOSHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.oeminfo);
+            }
+
+            @Override
+            public Optional<String> getStringValue(ExtendedDOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.oeminfo, size(), ByteOrder.LITTLE_ENDIAN);
             }
         },
         RES2 {
@@ -83,6 +99,12 @@ public class ExtendedDOSHeader extends DOSHeader<ExtendedDOSHeader.ExtensionFiel
                 for (int i = 0; i < source.res2.length; i++)
                     putUnsignedShort(dest, source.res2[i]);
             }
+            
+            @Override
+            public Optional<String> getStringValue(ExtendedDOSHeader format, DisplayFormat displayFormat) {
+                return Optional.of(Arrays.toString(format.res2));
+            }
+            
         },
         NEW_POS {
             public int size() {
@@ -95,6 +117,11 @@ public class ExtendedDOSHeader extends DOSHeader<ExtendedDOSHeader.ExtensionFiel
 
             public void write(ExtendedDOSHeader source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.newPos);
+            }
+
+            @Override
+            public Optional<String> getStringValue(ExtendedDOSHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.newPos, size(), ByteOrder.LITTLE_ENDIAN);
             }
         };
 
@@ -158,22 +185,8 @@ public class ExtendedDOSHeader extends DOSHeader<ExtendedDOSHeader.ExtensionFiel
     }
 
     public Optional<String> getStringValue(ExtensionField field, DisplayFormat displayFormat) {
-        switch (field) {
-            case RES1:
-                return Optional.of(Arrays.toString(res1));
-            case OEMID:
-                return Optional.of(String.valueOf(oemid));
-            case OEMINFO:
-                return Optional.of(String.valueOf(oeminfo));
-            case RES2:
-                return Optional.of(Arrays.toString(res2));
-            case NEW_POS:
-                return Optional.of(String.valueOf(newPos));
-            default:
-                throw new IllegalArgumentException(field.toString());
-        }
+        return field.getStringValue(this, displayFormat);
     }
-
 
     @Override
     public Location createHeaderExtensionsFrom(ByteBuffer readBuffer, boolean canTakeBuffer) {
@@ -201,14 +214,6 @@ public class ExtendedDOSHeader extends DOSHeader<ExtendedDOSHeader.ExtensionFiel
         for (int i = 0; i < remaining; i++) {
             writeBuffer.put((byte) 0);
         }
-    }
-
-    public void writeFieldsTo(ByteBuffer writeBuffer, Iterator<Field> fields) {
-        while (fields.hasNext()) {
-            Field field = fields.next();
-            field.write(this, writeBuffer);
-        }
-
     }
 
     @Override

@@ -1,13 +1,18 @@
 package llj.packager.coff;
 
 import llj.packager.DisplayFormat;
+import llj.packager.FieldSequenceFormat;
 import llj.packager.IntrospectableFormat;
+import llj.packager.dosexe.DOSHeader;
 import llj.packager.winpe.PEFormat;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,12 +24,17 @@ import static llj.util.BinIOTools.putUnsignedInt;
 import static llj.util.BinIOTools.putUnsignedShort;
 import static llj.util.BinIOTools.readIntoBuffer;
 
-public class SectionHeader implements IntrospectableFormat {
+public class SectionHeader extends FieldSequenceFormat {
 
     public static final int SIZE = 40;
 
-    public static enum Field {
+    public static enum Field implements FieldSequenceFormat.Field<SectionHeader> {
         NAME {
+            @Override
+            public int size() {
+                return NameOrStringTablePointer.SIZE;
+            }
+
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.name.read(source);
             }
@@ -32,8 +42,18 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 source.name.write(dest);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return Optional.of(format.name.resolve());
+            }
         },
         PHYSICAL_ADDRESS_OR_VIRTUAL_SIZE {
+            
+            public int size() {
+                return DWORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.physicalAddressOrVirtualSize = getUnsignedInt(source);
             }
@@ -41,8 +61,18 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.physicalAddressOrVirtualSize);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.physicalAddressOrVirtualSize, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         VIRTUAL_ADDRESS {
+
+            public int size() {
+                return DWORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.virtualAddress = getUnsignedInt(source);
             }
@@ -50,8 +80,19 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.virtualAddress);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.virtualAddress, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         SIZE_OF_RAW_DATA {
+
+            public int size() {
+                return DWORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.sizeOfRawData = getUnsignedInt(source);
             }
@@ -59,8 +100,19 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.sizeOfRawData);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.sizeOfRawData, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         POINTER_TO_RAW_DATA {
+
+            public int size() {
+                return DWORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.pointerToRawData = getUnsignedInt(source);
             }
@@ -68,8 +120,19 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.pointerToRawData);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.pointerToRawData, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         POINTER_TO_RELOCATIONS {
+
+            public int size() {
+                return DWORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.pointerToRelocations = getUnsignedInt(source);
             }
@@ -77,8 +140,19 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.pointerToRelocations);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.pointerToRelocations, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         POINTER_TO_LINE_NUMBERS {
+
+            public int size() {
+                return DWORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.pointerToLinenumbers = getUnsignedInt(source);
             }
@@ -86,8 +160,19 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.pointerToLinenumbers);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.pointerToLinenumbers, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         NUMBER_OF_RELOCATIONS {
+
+            public int size() {
+                return WORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.numberOfRelocations = getUnsignedShort(source);
             }
@@ -95,8 +180,19 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.numberOfRelocations);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.numberOfRelocations, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         NUMBER_OF_LINE_NUMBERS {
+
+            public int size() {
+                return WORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.numberOfLinenumbers = getUnsignedShort(source);
             }
@@ -104,8 +200,19 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedShort(dest, source.numberOfLinenumbers);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.numberOfLinenumbers, size(), ByteOrder.LITTLE_ENDIAN);
+            }
+            
         },
         CHARACTERISTICS {
+
+            public int size() {
+                return DWORD;
+            }
+            
             public void read(ByteBuffer source, SectionHeader dest) {
                 dest.characteristics = getUnsignedInt(source);
             }
@@ -113,11 +220,17 @@ public class SectionHeader implements IntrospectableFormat {
             public void write(SectionHeader source, ByteBuffer dest) {
                 putUnsignedInt(dest, source.characteristics);
             }
+
+            @Override
+            public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
+                if (displayFormat == DisplayFormat.DEFAULT || displayFormat == DisplayFormat.FLAGS_SET) {
+                    return Optional.of("" + CharacteristicsField.getAllSetInValue(format.characteristics));
+                } else {
+                    return Optional.of(String.valueOf(format.characteristics));
+                }
+
+            }
         };
-
-        public abstract void read(ByteBuffer source, SectionHeader dest);
-
-        public abstract void write(SectionHeader source, ByteBuffer dest);
 
     }
 
@@ -201,60 +314,19 @@ public class SectionHeader implements IntrospectableFormat {
     public int numberOfLinenumbers;
     public long characteristics;
 
+    @Override
+    public Collection<? extends FieldSequenceFormat.Field> fields() {
+        return Arrays.asList(SectionHeader.Field.values());
+    }
+
     public void readFrom(ReadableByteChannel in, ByteBuffer readBuffer) throws IOException {
         readIntoBuffer(in, readBuffer, SIZE);
         readFrom(readBuffer);
     }
 
-    public void readFrom(ByteBuffer readBuffer) {
-        for (Field field : Field.values()) {
-            field.read(readBuffer, this);
-        }
-    }
-
-    public void writeTo(ByteBuffer writeBuffer) {
-        for (Field field : Field.values()) {
-            field.write(this, writeBuffer);
-        }
-    }
-
-    @Override
-    public List<String> getNames() {
-        List<String> result = new ArrayList<>();
-        for (Field field : Field.values()) {
-            result.add(field.name());
-        }
-        return result;
-    }
-
-    @Override
-    public Optional<String> getStringValue(String fieldName, DisplayFormat displayFormat) {
-        List<String> result = new ArrayList<>();
-        for (Field field : Field.values()) {
-            if (field.name().equals(fieldName)) {
-                return getStringValue(field, displayFormat);
-            }
-        }
-        throw new IllegalArgumentException(fieldName);
-    }
-
     public Optional<String> getStringValue(Field field, DisplayFormat displayFormat) {
-        // all fields in section header are mandatory/fixed
-        switch (field) {
-            case NAME: return Optional.of(new String(name.name));
-            case PHYSICAL_ADDRESS_OR_VIRTUAL_SIZE: return Optional.of(String.valueOf(physicalAddressOrVirtualSize));
-            case VIRTUAL_ADDRESS: return Optional.of(String.valueOf(virtualAddress));
-            case SIZE_OF_RAW_DATA: return Optional.of(String.valueOf(sizeOfRawData));
-            case POINTER_TO_RAW_DATA: return Optional.of(String.valueOf(pointerToRawData));
-            case POINTER_TO_RELOCATIONS: return Optional.of(String.valueOf(pointerToRelocations));
-            case POINTER_TO_LINE_NUMBERS: return Optional.of(String.valueOf(pointerToLinenumbers));
-            case NUMBER_OF_RELOCATIONS: return Optional.of(String.valueOf(numberOfRelocations));
-            case NUMBER_OF_LINE_NUMBERS: return Optional.of(String.valueOf(numberOfLinenumbers));
-            case CHARACTERISTICS: return Optional.of(String.valueOf(characteristics));
-            default: throw new IllegalArgumentException(field.name());
-        }
+        return field.getStringValue(this, displayFormat);
     }
-    
 
     @Override
     public int getSize() {
@@ -264,5 +336,19 @@ public class SectionHeader implements IntrospectableFormat {
     @Override
     public String getStringValue() {
         return "";
+    }
+
+    @Override
+    public boolean isDisplayFormatSupported(String fieldName, DisplayFormat format) {
+        return getStringValue(fieldName, format).isPresent();
+    }
+
+    @Override
+    public void setStringValue(String fieldName, DisplayFormat format) {
+        throw new UnsupportedOperationException();
+    }
+    
+    public boolean containsVirtualAddress(long virtualAddress) {
+        return ((virtualAddress >= this.virtualAddress) && (virtualAddress < this.virtualAddress + this.physicalAddressOrVirtualSize));
     }
 }

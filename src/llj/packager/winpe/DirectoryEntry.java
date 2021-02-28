@@ -8,9 +8,10 @@ import static llj.util.BinIOTools.putUnsignedInt;
 public class DirectoryEntry {
 
     public static final int SIZE = 8;
-
-    long VirtualAddress;
+    
+    long VirtualAddress;  // this field is actually RVA
     long Size;
+    String name;
 
     public void readFrom(ByteBuffer readBuffer) {
         VirtualAddress = getUnsignedInt(readBuffer);

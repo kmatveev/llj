@@ -5,11 +5,13 @@ import java.nio.ByteOrder;
 
 public class NameOrStringTablePointer {
 
+    public static final int SIZE = 8;
+
     public enum Type {NAME, STRING_TABLE_POINTER };
 
     public Type type;
 
-    public final char[] name = new char[8];
+    public final char[] name = new char[SIZE];
 
     public long stringTablePointer;
 
@@ -27,10 +29,21 @@ public class NameOrStringTablePointer {
         }
 
     }
-
+    
+    // TODO
     public void write(ByteBuffer dest) {
         throw new UnsupportedOperationException();
     }
 
-
+    public int getSize() {
+        return SIZE;
+    }
+    
+    public String resolve() {
+        if (type == Type.NAME) {
+            return new String(name);
+        } else {
+            throw new UnsupportedOperationException();
+        }
+    }
 }

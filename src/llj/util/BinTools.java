@@ -1,5 +1,9 @@
 package llj.util;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.util.Arrays;
 
 public class BinTools {
@@ -46,6 +50,26 @@ public class BinTools {
 
     public static int getSignedShort(byte[] source, int i1) {
         return (source[i1] << 8) | (source[i1 + 1] & 0xFF);
+    }
+
+    public static String readZeroTerminatedAsciiString(ByteBuffer bb) {
+        try {        
+            int pos = bb.position();
+            int prevLimit = bb.limit();
+            while (true) {
+                if (bb.get() == 0) break;
+            }
+            int pos2 = bb.position();
+            bb.limit(pos2 - 1);
+            bb.position(pos);
+            CharsetDecoder decoder = Charset.forName("US-ASCII").newDecoder();
+            String result = decoder.decode(bb).toString();
+            bb.limit(prevLimit);
+            bb.position(pos2);
+            return result;
+        } catch (CharacterCodingException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     public static interface BinReader<T> {

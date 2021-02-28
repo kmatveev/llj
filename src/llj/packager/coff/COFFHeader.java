@@ -1,16 +1,19 @@
 package llj.packager.coff;
 
 import llj.packager.DisplayFormat;
+import llj.packager.FieldSequenceFormat;
 import llj.packager.IntrospectableFormat;
-import llj.packager.dosexe.DOSHeader;
 import llj.packager.winpe.PEFormat;
 
 import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,11 +23,11 @@ import static llj.util.BinIOTools.putUnsignedInt;
 import static llj.util.BinIOTools.putUnsignedShort;
 import static llj.util.BinIOTools.readIntoBuffer;
 
-public class COFFHeader implements IntrospectableFormat {
+public class COFFHeader extends FieldSequenceFormat {
 
     public static final int SIZE = 20;
 
-    public static enum Field {
+    public static enum Field implements FieldSequenceFormat.Field<COFFHeader>{
         MACHINE {
             public void read(ByteBuffer source, COFFHeader dest) {
                 dest.machine = getUnsignedShort(source);
@@ -35,6 +38,15 @@ public class COFFHeader implements IntrospectableFormat {
             }
             
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFHeader format, DisplayFormat displayFormat) {
+                if (displayFormat == DisplayFormat.DEFAULT) {
+                    return Optional.of(Machine.valueOf(format.machine).name());
+                } else {
+                    return DisplayFormat.getIntegerString(displayFormat, format.machine, size(), ByteOrder.LITTLE_ENDIAN);
+                }
+            }
         },
         NUMBER_OF_SECTIONS {
             public void read(ByteBuffer source, COFFHeader dest) {
@@ -46,6 +58,11 @@ public class COFFHeader implements IntrospectableFormat {
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.numberOfSections, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         TIME_DATE_STAMP {
             public void read(ByteBuffer source, COFFHeader dest) {
@@ -57,6 +74,11 @@ public class COFFHeader implements IntrospectableFormat {
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.timeDateStamp, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         POINTER_TO_SYMBOL_TABLE {
             public void read(ByteBuffer source, COFFHeader dest) {
@@ -68,6 +90,11 @@ public class COFFHeader implements IntrospectableFormat {
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.pointerToSymbolTable, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         NUMBER_OF_SYMBOLS {
             public void read(ByteBuffer source, COFFHeader dest) {
@@ -79,6 +106,11 @@ public class COFFHeader implements IntrospectableFormat {
             }
 
             public int size() { return DWORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getLongString(displayFormat, format.numberOfSymbols, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         SIZE_OF_OPTIONAL_HEADER {
             public void read(ByteBuffer source, COFFHeader dest) {
@@ -90,6 +122,11 @@ public class COFFHeader implements IntrospectableFormat {
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFHeader format, DisplayFormat displayFormat) {
+                return DisplayFormat.getIntegerString(displayFormat, format.sizeOfOptionalHeader, size(), ByteOrder.LITTLE_ENDIAN);
+            }
         },
         CHARACTERISTICS {
             public void read(ByteBuffer source, COFFHeader dest) {
@@ -101,6 +138,17 @@ public class COFFHeader implements IntrospectableFormat {
             }
 
             public int size() { return WORD; }
+
+            @Override
+            public Optional<String> getStringValue(COFFHeader format, DisplayFormat displayFormat) {
+                if (displayFormat == DisplayFormat.DEFAULT || displayFormat == DisplayFormat.FLAGS_SET) {
+                    List<COFFHeader.CharacteristicsField> fields = COFFHeader.CharacteristicsField.getAllSetInValue(format.characteristics);
+                    return Optional.of("" + fields);
+                } else {
+                    return Optional.of(String.valueOf(format.characteristics));
+                }
+
+            }
         };
 
         public abstract void read(ByteBuffer source, COFFHeader dest);
@@ -108,6 +156,8 @@ public class COFFHeader implements IntrospectableFormat {
         public abstract void write(COFFHeader source, ByteBuffer dest);
         
         public abstract int size();
+        
+        public abstract Optional<String> getStringValue(COFFHeader format, DisplayFormat displayFormat);
 
     }
 
@@ -197,78 +247,28 @@ public class COFFHeader implements IntrospectableFormat {
     public int sizeOfOptionalHeader;
     public int characteristics;
 
+    @Override
+    public Collection<Field> fields() {
+        return Arrays.asList(Field.values());
+    }
+
     public Field readFrom(ReadableByteChannel in, ByteBuffer readBuffer) throws IOException {
         readIntoBuffer(in, readBuffer, SIZE);
-        return readFrom(readBuffer);
+        return (Field)readFrom(readBuffer);
     }
 
-    public Field readFrom(ByteBuffer readBuffer) {
-        for (Field field : Field.values()) {
-            try {
-                field.read(readBuffer, this);
-            } catch (BufferUnderflowException e) {
-                return field;
-            }
-        }
-        return null;
-    }
-
-    public void writeTo(ByteBuffer writeBuffer) {
-        for (Field field : Field.values()) {
-            field.write(this, writeBuffer);
-        }
-    }
-
-    public List<String> getNames() {
-        List<String> result = new ArrayList<String>();
-        for (Field field: Field.values()) {
-            result.add(field.name());
-        }
-        return result;
-    }
-
-    public Optional<String> getStringValue(String fieldName, DisplayFormat displayFormat) {
-        for (Field field: Field.values()) {
-            if (field.name().equals(fieldName)) {
-                return getStringValue(field, displayFormat);
-            }
-        }
-        throw new IllegalArgumentException(fieldName);
+    @Override
+    public boolean isDisplayFormatSupported(String fieldName, DisplayFormat format) {
+        return getStringValue(fieldName, format).isPresent();
     }
 
     public Optional<String> getStringValue(Field field, DisplayFormat displayFormat) {
-        // all fields in COFF header are mandatory/fixed
-        switch(field) {
-            case MACHINE: return Optional.of(String.valueOf(machine));
-            case NUMBER_OF_SECTIONS: return Optional.of(String.valueOf(numberOfSections));
-            case TIME_DATE_STAMP: return Optional.of(String.valueOf(timeDateStamp));
-            case POINTER_TO_SYMBOL_TABLE: return Optional.of(String.valueOf(pointerToSymbolTable));
-            case NUMBER_OF_SYMBOLS: return Optional.of(String.valueOf(numberOfSymbols));
-            case SIZE_OF_OPTIONAL_HEADER: return Optional.of(String.valueOf(sizeOfOptionalHeader));
-            case CHARACTERISTICS: return Optional.of(String.valueOf(characteristics));
-            default: throw new IllegalArgumentException(field.toString());
-        }
+        return field.getStringValue(this, displayFormat);
     }
 
-    public int getSize(String fieldName) {
-        for (COFFHeader.Field field: COFFHeader.Field.values()) {
-            if (field.name().equals(fieldName)) {
-                return field.size();
-            }
-        }
-        throw new IllegalArgumentException(fieldName);
-    }
-
-    public int getOffset(String fieldName) {
-        int offset = 0;
-        for (COFFHeader.Field field: COFFHeader.Field.values()) {
-            if (field.name().equals(fieldName)) {
-                return offset;
-            } else {
-                offset += field.size();
-            }
-        }
-        throw new IllegalArgumentException(fieldName);
+    @Override
+    public void setStringValue(String fieldName, DisplayFormat format) {
+        throw new UnsupportedOperationException();
     }
 
     @Override
