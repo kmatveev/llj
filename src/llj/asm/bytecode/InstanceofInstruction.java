@@ -21,6 +21,11 @@ public class InstanceofInstruction extends Instruction {
     }
 
     @Override
+    public String toString() {
+        return super.toString() + " " + classRef.toString();
+    }
+
+    @Override
     public Effect getEffect() {
         return effect;
     }

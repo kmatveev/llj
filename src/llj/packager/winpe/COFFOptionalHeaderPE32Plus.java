@@ -31,11 +31,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
 
         IMAGE_BASE {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.imageBase = getLong(source);
+                dest.imageBase = getLong(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putLong(dest, source.imageBase);
+                putLong(dest, source.imageBase, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return 2*DWORD; }
@@ -48,11 +48,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         SECTION_ALIGNMENT {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.sectionAlignment = getUnsignedInt(source);
+                dest.sectionAlignment = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.sectionAlignment);
+                putUnsignedInt(dest, source.sectionAlignment, ByteOrder.LITTLE_ENDIAN);
             }
             public int size() { return DWORD; }
 
@@ -64,11 +64,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         FILE_ALIGNMENT {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.fileAlignment = getUnsignedInt(source);
+                dest.fileAlignment = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.fileAlignment);
+                putUnsignedInt(dest, source.fileAlignment, ByteOrder.LITTLE_ENDIAN);
             }
             public int size() { return DWORD; }
 
@@ -80,11 +80,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         MAJOR_OS_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.majorOperatingSystemVersion = getUnsignedShort(source);
+                dest.majorOperatingSystemVersion = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.majorOperatingSystemVersion);
+                putUnsignedShort(dest, source.majorOperatingSystemVersion, ByteOrder.LITTLE_ENDIAN);
             }
             public int size() { return WORD; }
 
@@ -96,11 +96,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         MINOR_OS_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.minorOperatingSystemVersion = getUnsignedShort(source);
+                dest.minorOperatingSystemVersion = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.majorOperatingSystemVersion);
+                putUnsignedShort(dest, source.minorOperatingSystemVersion, ByteOrder.LITTLE_ENDIAN);
             }
             public int size() { return WORD; }
 
@@ -112,10 +112,10 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         MAJOR_IMAGE_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.majorImageVersion = getUnsignedShort(source);
+                dest.majorImageVersion = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.majorImageVersion);
+                putUnsignedShort(dest, source.majorImageVersion, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }
@@ -128,11 +128,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         MINOR_IMAGE_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.minorImageVersion = getUnsignedShort(source);
+                dest.minorImageVersion = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.minorImageVersion);
+                putUnsignedShort(dest, source.minorImageVersion, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }
@@ -145,11 +145,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         MAJOR_SUBSYSTEM_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.majorSubsystemVersion = getUnsignedShort(source);
+                dest.majorSubsystemVersion = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.majorSubsystemVersion);
+                putUnsignedShort(dest, source.majorSubsystemVersion, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }
@@ -162,11 +162,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         MINOR_SUBSYSTEM_VERSION {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.minorSubsystemVersion = getUnsignedShort(source);
+                dest.minorSubsystemVersion = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.minorSubsystemVersion);
+                putUnsignedShort(dest, source.minorSubsystemVersion, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }
@@ -179,11 +179,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         RESERVED1 {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.reserved1 = getUnsignedInt(source);
+                dest.reserved1 = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.reserved1);
+                putUnsignedInt(dest, source.reserved1, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return DWORD; }
@@ -196,11 +196,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         SIZE_OF_IMAGE {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.sizeOfImage = getUnsignedInt(source);
+                dest.sizeOfImage = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.sizeOfImage);
+                putUnsignedInt(dest, source.sizeOfImage, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return DWORD; }
@@ -213,11 +213,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         SIZE_OF_HEADERS {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.sizeOfHeaders = getUnsignedInt(source);
+                dest.sizeOfHeaders = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.sizeOfHeaders);
+                putUnsignedInt(dest, source.sizeOfHeaders, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return DWORD; }
@@ -230,11 +230,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         CHECKSUM {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.checkSum = getUnsignedInt(source);
+                dest.checkSum = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.checkSum);
+                putUnsignedInt(dest, source.checkSum, ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
@@ -250,11 +250,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         SUBSYSTEM {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.subsystem = getUnsignedShort(source);
+                dest.subsystem = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.subsystem);
+                putUnsignedInt(dest, source.subsystem, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }
@@ -267,11 +267,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         DLL_CHARACTERISTICS {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.dllCharacteristics = getUnsignedShort(source);
+                dest.dllCharacteristics = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.dllCharacteristics);
+                putUnsignedShort(dest, source.dllCharacteristics, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }
@@ -284,11 +284,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         SIZE_OF_STACK_RESERVE {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.sizeOfStackReserve = getLong(source);
+                dest.sizeOfStackReserve = getLong(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putLong(dest, source.sizeOfStackReserve);
+                putLong(dest, source.sizeOfStackReserve, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return 2*DWORD; }
@@ -301,11 +301,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         SIZE_OF_STACK_COMMIT {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.sizeOfStackCommit = getLong(source);
+                dest.sizeOfStackCommit = getLong(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putLong(dest, source.sizeOfStackCommit);
+                putLong(dest, source.sizeOfStackCommit, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return 2*DWORD; }
@@ -318,11 +318,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         SIZE_OF_HEAP_RESERVE {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.sizeOfHeapReserve = getLong(source);
+                dest.sizeOfHeapReserve = getLong(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putLong(dest, source.sizeOfHeapReserve);
+                putLong(dest, source.sizeOfHeapReserve, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return 2*DWORD; }
@@ -335,11 +335,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         SIZE_OF_HEAP_COMMIT {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.sizeOfHeapCommit = getLong(source);
+                dest.sizeOfHeapCommit = getLong(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putLong(dest, source.sizeOfHeapCommit);
+                putLong(dest, source.sizeOfHeapCommit, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return 2*DWORD; }
@@ -352,11 +352,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         LOADER_FLAGS {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.loaderFlags = getUnsignedInt(source);
+                dest.loaderFlags = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.loaderFlags);
+                putUnsignedInt(dest, source.loaderFlags, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return DWORD; }
@@ -369,11 +369,11 @@ public class COFFOptionalHeaderPE32Plus extends COFFOptionalHeaderStandard<COFFO
         },
         NUMBER_OF_RVA_AND_SIZES {
             public void read(ByteBuffer source, COFFOptionalHeaderPE32Plus dest) {
-                dest.numberOfRvaAndSizes = getUnsignedInt(source);
+                dest.numberOfRvaAndSizes = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFOptionalHeaderPE32Plus source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.numberOfRvaAndSizes);
+                putUnsignedInt(dest, source.numberOfRvaAndSizes, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return DWORD; }

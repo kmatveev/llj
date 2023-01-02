@@ -23,12 +23,12 @@ public class ResourceDirectoryTable extends FieldSequenceFormat {
         CHARACTERISTICS {
             @Override
             public void read(ByteBuffer source, ResourceDirectoryTable dest) {
-                dest.characteristics = getInt(source);
+                dest.characteristics = getInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
             public void write(ResourceDirectoryTable source, ByteBuffer dest) {
-                BinIOTools.putInt(dest, source.characteristics);
+                BinIOTools.putInt(dest, source.characteristics, ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
@@ -45,12 +45,12 @@ public class ResourceDirectoryTable extends FieldSequenceFormat {
         TIME_DATE_STAMP {
             @Override
             public void read(ByteBuffer source, ResourceDirectoryTable dest) {
-                dest.timedatestamp = getInt(source);
+                dest.timedatestamp = getInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
             public void write(ResourceDirectoryTable source, ByteBuffer dest) {
-                BinIOTools.putInt(dest, source.timedatestamp);
+                BinIOTools.putInt(dest, source.timedatestamp, ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
@@ -67,12 +67,12 @@ public class ResourceDirectoryTable extends FieldSequenceFormat {
         MAJOR_VERSION {
             @Override
             public void read(ByteBuffer source, ResourceDirectoryTable dest) {
-                dest.majorVersion = getUnsignedShort(source);
+                dest.majorVersion = getUnsignedShort(source,  ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
             public void write(ResourceDirectoryTable source, ByteBuffer dest) {
-                BinIOTools.putUnsignedShort(dest, source.majorVersion);
+                BinIOTools.putUnsignedShort(dest, source.majorVersion,  ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
@@ -89,12 +89,12 @@ public class ResourceDirectoryTable extends FieldSequenceFormat {
         MINOR_VERSION {
             @Override
             public void read(ByteBuffer source, ResourceDirectoryTable dest) {
-                dest.minorVersion = getUnsignedShort(source);
+                dest.minorVersion = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
             public void write(ResourceDirectoryTable source, ByteBuffer dest) {
-                BinIOTools.putUnsignedShort(dest, source.minorVersion);
+                BinIOTools.putUnsignedShort(dest, source.minorVersion,  ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
@@ -111,12 +111,12 @@ public class ResourceDirectoryTable extends FieldSequenceFormat {
         NUMBER_OF_NAME_ENTRIES {
             @Override
             public void read(ByteBuffer source, ResourceDirectoryTable dest) {
-                dest.numberOfNameEntries = getUnsignedShort(source);
+                dest.numberOfNameEntries = getUnsignedShort(source,  ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
             public void write(ResourceDirectoryTable source, ByteBuffer dest) {
-                BinIOTools.putUnsignedShort(dest, source.numberOfNameEntries);
+                BinIOTools.putUnsignedShort(dest, source.numberOfNameEntries,  ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
@@ -133,12 +133,12 @@ public class ResourceDirectoryTable extends FieldSequenceFormat {
         NUMBER_OF_ID_ENTRIES {
             @Override
             public void read(ByteBuffer source, ResourceDirectoryTable dest) {
-                dest.numberOfIdEntries = getUnsignedShort(source);
+                dest.numberOfIdEntries = getUnsignedShort(source,  ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override
             public void write(ResourceDirectoryTable source, ByteBuffer dest) {
-                BinIOTools.putUnsignedShort(dest, source.numberOfIdEntries);
+                BinIOTools.putUnsignedShort(dest, source.numberOfIdEntries,  ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override

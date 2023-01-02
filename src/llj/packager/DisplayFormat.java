@@ -13,7 +13,7 @@ import static llj.packager.Format.WORD;
 
 public enum DisplayFormat {
     
-    DEFAULT, HEX_BYTES, ASCII, DEC_NUMBER, HEX_NUMBER, FLAGS_SET;
+    DEFAULT, HEX_BYTES, ASCII, DEC_NUMBER, HEX_NUMBER, FLAGS_SET, ENUM;
 
     public static Optional<String> getBytesString(DisplayFormat displayFormat, byte[] val) {
         if (displayFormat == ASCII) {
@@ -70,6 +70,18 @@ public enum DisplayFormat {
             buffer.order(byteOrder);
             BinIOTools.putUnsignedInt(buffer, val);
             return Optional.of(HexTools.hexBytes(buffer.array()));
+        } else {
+            return Optional.empty();
+        }
+    }
+    
+    public static Optional<String> getEnumString(DisplayFormat displayFormat, Enum en) {
+        if (displayFormat == DisplayFormat.DEFAULT || displayFormat == DisplayFormat.ENUM) {
+            return Optional.of(en.name());
+        } else if (displayFormat == DisplayFormat.DEC_NUMBER) {
+            return Optional.of(String.valueOf(en.ordinal()));
+        } else if (displayFormat == DisplayFormat.HEX_NUMBER) {
+            return Optional.of("0x" + Integer.toHexString(en.ordinal())); 
         } else {
             return Optional.empty();
         }

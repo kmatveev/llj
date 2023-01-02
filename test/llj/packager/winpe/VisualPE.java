@@ -2,6 +2,7 @@ package llj.packager.winpe;
 
 import llj.packager.DisplayFormat;
 import llj.packager.IntrospectableFormat;
+import llj.packager.ar.ARFormat;
 import llj.packager.coff.COFFHeader;
 import llj.packager.coff.NameOrStringTablePointer;
 import llj.packager.coff.Section;
@@ -10,6 +11,8 @@ import llj.packager.dosexe.DOSExeFormat;
 import llj.packager.dosexe.DOSExeFormatException;
 import llj.packager.dosexe.DOSHeader;
 import llj.packager.objcoff.OBJCOFFFormat;
+import llj.packager.winlib.ImportFormat;
+import llj.packager.winlib.ImportHeader;
 import llj.util.swing.GridBagByRowAdder;
 
 import javax.swing.AbstractAction;
@@ -35,10 +38,13 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTree;
+import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.UIManager;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.table.DefaultTableModel;
@@ -55,10 +61,14 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.OpenOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
@@ -119,6 +129,9 @@ public class VisualPE {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     JFileChooser classChooser = new JFileChooser();
+                    if (file != null) {
+                        classChooser.setCurrentDirectory(file.getParentFile());
+                    }
                     int result = classChooser.showOpenDialog(frame);
                     if (result == JFileChooser.APPROVE_OPTION) {
                         File selected = classChooser.getSelectedFile();
@@ -131,6 +144,12 @@ public class VisualPE {
                     }
 
 
+                }
+            });
+            menuFile.add(new AbstractAction("Reload") {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    setFile(file);
                 }
             });
             menuFile.addSeparator();
@@ -201,7 +220,8 @@ public class VisualPE {
             
             Map<Object, DisplayFormat> displayFormatMap = new HashMap<>();
 
-            if (file.toPath().getFileName().toString().endsWith(".exe")) {
+            String fileName = file.toPath().getFileName().toString().toLowerCase();
+            if (fileName.endsWith(".exe") || fileName.endsWith(".dll")) {
 
                 DOSExeFormat dosExeFormat = new DOSExeFormat();
                 boolean formatOk = false;
@@ -247,7 +267,7 @@ public class VisualPE {
                 createAnyFormatRenderer(file, displayFormatMap, "Windows PE");
                 createPEFormatRenderer(displayFormatMap, peFormat);
 
-            } else if (file.toPath().getFileName().toString().endsWith(".obj")) {
+            } else if (fileName.endsWith(".obj")) {
 
                 OBJCOFFFormat objFormat = new OBJCOFFFormat();
                 try {
@@ -285,6 +305,29 @@ public class VisualPE {
                     System.out.println("  "  + "characteristics are: " + fields);
                 }                
                 
+            } else if (fileName.endsWith(".lib")) {
+                
+                ARFormat format = new ARFormat();
+                boolean formatOk = false;
+                try {
+                    format.readFrom(fileChannel);
+                    formatOk = true;
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(frame, "Was unable to read selected file", "File read error", JOptionPane.ERROR_MESSAGE);
+                }
+
+                if (!formatOk) {
+                    return;
+                }
+
+                removeAllRenderers();
+                createAnyFormatRenderer(file, displayFormatMap, "LIBRARY");
+                createLIBFormatRenderer(displayFormatMap, format, fileChannel);
+                
+                
+
+            } else {
+                JOptionPane.showMessageDialog(frame, "File extension is not recognized", "Unknown file type", JOptionPane.INFORMATION_MESSAGE);
             }
 
             tree.setEnabled(true);
@@ -452,6 +495,15 @@ public class VisualPE {
             resourceDirectoryNodes.put(resourcesRootNode, rootWrapperEntry);
             peNode.add(resourcesRootNode);
             processChildren(rootWrapperEntry, resourcesRootNode, resourceDirectoryNodes, 1);
+        
+        DefaultMutableTreeNode relocationsNode = new DefaultMutableTreeNode("PE relocations");
+        peNode.add(relocationsNode);
+        IdentityHashMap<DefaultMutableTreeNode, BaseRelocationsBlock> relocationsBlockNodes = new IdentityHashMap<>();
+        for (BaseRelocationsBlock relocBlock : peFormat.baseRelocations) {
+            DefaultMutableTreeNode relocationsBlockNode = new DefaultMutableTreeNode(relocBlock.pageRva);
+            relocationsBlockNodes.put(relocationsBlockNode, relocBlock);
+            relocationsNode.add(relocationsBlockNode);
+        }
 
 
         coffRelocationsNode = new DefaultMutableTreeNode("COFF relocations");
@@ -550,7 +602,8 @@ public class VisualPE {
 
                         // JLabel offsetLabel = new JLabel("(offset:" + format.dosHeader.getOffset(fieldName) + ";" + "size:" + format.dosHeader.getSize(fieldName) + ")");
                         // JLabel valueLabel = new JLabel(format.header.getStringValue(fieldName));
-                        DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
+                        String displayFormatPrefix = "DOS_HEADER_";
+                        DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(displayFormatPrefix + fieldName, DisplayFormat.DEFAULT);
                         JTextField valueTextField = new JTextField(dosHeader.getStringValue(fieldName, selectedDisplayFormat).get(), 10);
                         // valueTextField.setEnabled(false);
                         valueTextField.setEditable(false);
@@ -559,10 +612,10 @@ public class VisualPE {
                             JPopupMenu popup = new JPopupMenu();
                             valueTextField.setComponentPopupMenu(popup);
 
-                            JMenuItem fieldInfoItem = addFieldInfoMenu(dosHeader, fieldName, 0, displayFormatMap);
+                            JMenuItem fieldInfoItem = addFieldInfoMenu(dosHeader, fieldName, 0, displayFormatPrefix, displayFormatMap);
                             popup.add(fieldInfoItem);
 
-                            JMenu subMenu = addDisplayFormatsMenu(dosHeader, fieldName, valueTextField, displayFormatMap);
+                            JMenu subMenu = addDisplayFormatsMenu(dosHeader, fieldName, valueTextField, displayFormatPrefix, displayFormatMap);
                             popup.add(subMenu);
 
                         }
@@ -602,7 +655,7 @@ public class VisualPE {
                     }
                     fileInfoAdder.addRow(peInfoPanel, new JLabel("PE format: "), new JLabel(peFormatDetails), makeFiller());
 
-                    fileInfoAdder.addRow(peInfoPanel, new JLabel("PE offset from start of file: "), new JLabel(String.valueOf(peFormat.getPEOffset())), makeFiller());
+                    fileInfoAdder.addRow(peInfoPanel, new JLabel("PE offset from start of file: "), new JLabel(getDecAndHexStr(peFormat.getPEOffset())), makeFiller());
 
 
                     JLabel headersTotalSizeLabel = new JLabel("PE headers and section headers total size: ");
@@ -627,7 +680,7 @@ public class VisualPE {
 
                     GridBagByRowAdder fileInfoAdder = new GridBagByRowAdder(col1, col2, col4);
 
-                    fileInfoAdder.addRow(peInfoPanel, new JLabel("PE headers offset from start of file: "), new JLabel(String.valueOf(peFormat.getCOFFHeaderOffset())), makeFiller());
+                    fileInfoAdder.addRow(peInfoPanel, new JLabel("PE headers offset from start of file: "), new JLabel(getDecAndHexStr(peFormat.getCOFFHeaderOffset())), makeFiller());
                     fileInfoAdder.addRow(peInfoPanel, new JLabel("PE COFF headers size: "), new JLabel(String.valueOf(peFormat.getPEHeadersTotalSize())), makeFiller());
                     fileInfoAdder.addRow(peInfoPanel, new JLabel("Section headers total size: "), new JLabel(String.valueOf(peFormat.getSectionHeadersSize())), makeFiller());
 
@@ -647,6 +700,8 @@ public class VisualPE {
 
                     GridBagByRowAdder coffRowAdder = new GridBagByRowAdder(col1, col2, col4);
 
+                    
+
                     IntrospectableFormat coffOptionalHeader;
                     if (peFormat.coffOptionalHeaderPE32Plus != null) {
                         coffOptionalHeader = peFormat.coffOptionalHeaderPE32Plus;
@@ -657,6 +712,14 @@ public class VisualPE {
                     } else {
                         return;
                     }
+
+                    long coffOptionalHeaderOffset = peFormat.getCOFFHeaderOffset() + peFormat.coffHeader.getSize();
+                    coffRowAdder.addRow(coffOptionalFieldsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(coffOptionalHeaderOffset)), makeFiller());
+                    coffRowAdder.addRow(coffOptionalFieldsPanel, new JLabel("Declared size: "), new JLabel(String.valueOf(peFormat.coffHeader.sizeOfOptionalHeader)), makeFiller());
+                    coffRowAdder.addRow(coffOptionalFieldsPanel, new JLabel("Used size: "), new JLabel(String.valueOf(coffOptionalHeader.getSize())), makeFiller());
+
+                    coffRowAdder.addSingleComponentWholeRow(coffOptionalFieldsPanel, new JSeparator(), new Insets(5, 5, 5, 5));
+                    
                     for (String fieldName : coffOptionalHeader.getNames()) {
                         
                         // this field is hadnled separatelly
@@ -668,7 +731,8 @@ public class VisualPE {
 
                         // JLabel offsetLabel = new JLabel("(offset:" + format.coffHeader.getOffset(fieldName) + ";" + "size:" + format.coffHeader.getSize(fieldName) + ")");
                         // JLabel valueLabel = new JLabel(format.header.getStringValue(fieldName));
-                        DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
+                        String peOptionalHeadersPrefix = "PE_COFF_OPTIONAL_";
+                        DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(peOptionalHeadersPrefix + fieldName, DisplayFormat.DEFAULT);
                         JTextField valueTextField = new JTextField(coffOptionalHeader.getStringValue(fieldName, selectedDisplayFormat).get(), 10);
                         // valueTextField.setEnabled(false);
                         valueTextField.setEditable(false);
@@ -677,10 +741,10 @@ public class VisualPE {
                             JPopupMenu popup = new JPopupMenu();
                             valueTextField.setComponentPopupMenu(popup);
 
-                            JMenuItem fieldInfoItem = addFieldInfoMenu(coffOptionalHeader, fieldName, (int) (peFormat.getCOFFHeaderOffset() + COFFHeader.SIZE), displayFormatMap);
+                            JMenuItem fieldInfoItem = addFieldInfoMenu(coffOptionalHeader, fieldName, (int) (coffOptionalHeaderOffset), peOptionalHeadersPrefix, displayFormatMap);
                             popup.add(fieldInfoItem);
 
-                            JMenu subMenu = addDisplayFormatsMenu(coffOptionalHeader, fieldName, valueTextField, displayFormatMap);
+                            JMenu subMenu = addDisplayFormatsMenu(coffOptionalHeader, fieldName, valueTextField, peOptionalHeadersPrefix, displayFormatMap);
                             popup.add(subMenu);
 
                         }
@@ -694,7 +758,7 @@ public class VisualPE {
 
                     {
                         DefaultTableModel directoryTableModel = new DefaultTableModel();
-                        directoryTableModel.setColumnIdentifiers(new String[]{"Directory entry", "VirtualAddress", "Size", "Section", "Offset in section"});
+                        directoryTableModel.setColumnIdentifiers(new String[]{"Directory entry", "VirtualAddress", "Size", "Section", "Offset in section", "Offset in file"});
 
                         List<DirectoryEntry> dataDirectory = null;
                         if (peFormat.coffOptionalHeaderPE32Plus != null) {
@@ -705,13 +769,20 @@ public class VisualPE {
                         if (dataDirectory != null) {
 
                             for (DirectoryEntry directoryEntry : dataDirectory) {
-                                Section correspondingSection = peFormat.findByRelativeVirtualAddress(directoryEntry.VirtualAddress);
+                                Section correspondingSection = peFormat.findSectionByRVA(directoryEntry.VirtualAddress);
+                                long offsetInSection = 0, offsetInFile = 0;
+                                if (correspondingSection != null) {
+                                    offsetInSection = directoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
+                                    offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
+                                }
                                 directoryTableModel.addRow(new String[]{
                                         directoryEntry.name,
-                                        String.valueOf(directoryEntry.VirtualAddress),
+                                        getDecAndHexStr(directoryEntry.VirtualAddress),
                                         String.valueOf(directoryEntry.Size),
                                         correspondingSection != null ? correspondingSection.getName() : "",
-                                        correspondingSection != null ? String.valueOf(directoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress) : ""
+                                        correspondingSection != null ? String.valueOf(offsetInSection) : "",
+                                        correspondingSection != null ? getDecAndHexStr(offsetInFile) : ""
+                                        
                                 });
 
                             }
@@ -741,6 +812,11 @@ public class VisualPE {
 
                     GridBagByRowAdder coffRowAdder = new GridBagByRowAdder(col1, col2, col4);
 
+                    coffRowAdder.addRow(coffFieldsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(peFormat.getCOFFHeaderOffset())), makeFiller());
+                    coffRowAdder.addRow(coffFieldsPanel, new JLabel("Size: "), new JLabel(String.valueOf(peFormat.coffHeader.getSize())), makeFiller());
+
+                    coffRowAdder.addSingleComponentWholeRow(coffFieldsPanel, new JSeparator(), new Insets(5, 5, 5, 5));
+
                     COFFHeader coffHeader = peFormat.coffHeader;
                     for (String fieldName : coffHeader.getNames()) {
 
@@ -752,7 +828,8 @@ public class VisualPE {
 
                         // JLabel offsetLabel = new JLabel("(offset:" + format.coffHeader.getOffset(fieldName) + ";" + "size:" + format.coffHeader.getSize(fieldName) + ")");
                         // JLabel valueLabel = new JLabel(format.header.getStringValue(fieldName));
-                        DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
+                        String coffBasicHeadersPrefix = "PE_COFF_BASIC_";
+                        DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(coffBasicHeadersPrefix + fieldName, DisplayFormat.DEFAULT);
                         JTextField valueTextField = new JTextField(coffHeader.getStringValue(fieldName, selectedDisplayFormat).get(), 10);
                         // valueTextField.setEnabled(false);
                         valueTextField.setEditable(false);
@@ -762,10 +839,10 @@ public class VisualPE {
                             JPopupMenu popup = new JPopupMenu();
                             valueTextField.setComponentPopupMenu(popup);
 
-                            JMenuItem fieldInfoItem = addFieldInfoMenu(coffHeader, fieldName, (int) peFormat.getCOFFHeaderOffset(), displayFormatMap);
+                            JMenuItem fieldInfoItem = addFieldInfoMenu(coffHeader, fieldName, (int) peFormat.getCOFFHeaderOffset(), coffBasicHeadersPrefix, displayFormatMap);
                             popup.add(fieldInfoItem);
 
-                            JMenu subMenu = addDisplayFormatsMenu(coffHeader, fieldName, valueTextField, displayFormatMap);
+                            JMenu subMenu = addDisplayFormatsMenu(coffHeader, fieldName, valueTextField, coffBasicHeadersPrefix, displayFormatMap);
                             popup.add(subMenu);
 
                         }
@@ -792,7 +869,7 @@ public class VisualPE {
                     GridBagByRowAdder sectionsAdder = new GridBagByRowAdder(col1, col2, col4);
 
 
-                    sectionsAdder.addRow(sectionsInfoPanel, new JLabel("Section headers offset from start of file: "), new JLabel(String.valueOf(peFormat.getSectionHeadersOffset())), makeFiller());
+                    sectionsAdder.addRow(sectionsInfoPanel, new JLabel("Section headers offset from start of file: "), new JLabel(getDecAndHexStr(peFormat.getSectionHeadersOffset())), makeFiller());
                     sectionsAdder.addRow(sectionsInfoPanel, new JLabel("Number of sections: "), new JLabel(String.valueOf(peFormat.sections.size())), makeFiller());
                     sectionsAdder.addRow(sectionsInfoPanel, new JLabel("Total section headers size: "), new JLabel(String.valueOf(peFormat.getSectionHeadersSize())), makeFiller());
 
@@ -816,7 +893,7 @@ public class VisualPE {
 
                     int sectionIndex = peFormat.sections.indexOf(section);
                     long sectionHeaderOffsetFromStartOfFile = peFormat.getSectionHeadersOffset() + sectionIndex * SectionHeader.SIZE;
-                    sectionHeaderRowAdder.addRow(sectionFieldsPanel, new JLabel("Offset from start of file: "), new JLabel(String.valueOf(sectionHeaderOffsetFromStartOfFile)), makeFiller());
+                    sectionHeaderRowAdder.addRow(sectionFieldsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(sectionHeaderOffsetFromStartOfFile)), makeFiller());
                     sectionHeaderRowAdder.addRow(sectionFieldsPanel, new JLabel("Size: "), new JLabel(String.valueOf(SectionHeader.SIZE)), makeFiller());
 
                     sectionHeaderRowAdder.addSingleComponentWholeRow(sectionFieldsPanel, new JSeparator(), new Insets(10, 5, 10, 5));
@@ -828,7 +905,8 @@ public class VisualPE {
 
                         // JLabel offsetLabel = new JLabel("(offset:" + format.coffHeader.getOffset(fieldName) + ";" + "size:" + format.coffHeader.getSize(fieldName) + ")");
                         // JLabel valueLabel = new JLabel(format.header.getStringValue(fieldName));
-                        DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
+                        String sectionHeaders = "SECTIONS_";
+                        DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(sectionHeaders + fieldName, DisplayFormat.DEFAULT);
                         JTextField valueTextField = new JTextField(sectionHeader.getStringValue(fieldName, selectedDisplayFormat).get(), 10);
                         // valueTextField.setEnabled(false);
                         valueTextField.setEditable(false);
@@ -848,10 +926,10 @@ public class VisualPE {
                             JPopupMenu popup = new JPopupMenu();
                             valueTextField.setComponentPopupMenu(popup);
 
-                            JMenuItem fieldInfoItem = addFieldInfoMenu(sectionHeader, fieldName, (int) sectionHeaderOffsetFromStartOfFile, displayFormatMap);
+                            JMenuItem fieldInfoItem = addFieldInfoMenu(sectionHeader, fieldName, (int) sectionHeaderOffsetFromStartOfFile, sectionHeaders, displayFormatMap);
                             popup.add(fieldInfoItem);
 
-                            JMenu subMenu = addDisplayFormatsMenu(sectionHeader, fieldName, valueTextField, displayFormatMap);
+                            JMenu subMenu = addDisplayFormatsMenu(sectionHeader, fieldName, valueTextField, sectionHeaders, displayFormatMap);
                             popup.add(subMenu);
 
                         }
@@ -863,56 +941,140 @@ public class VisualPE {
                     sectionFieldsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
                     contentScrollPane.setViewportView(sectionFieldsPanel);
+                } else if (path != null && path.getLastPathComponent() == exportsNode) {
+
+                    JPanel exportsPanel = new JPanel();
+
+                    exportsPanel.setLayout(new GridBagLayout());
+
+                    GridBagByRowAdder exportsRowAdder = new GridBagByRowAdder(col1, col2, col4);
+
+                    DirectoryEntry exportDirectoryEntry = peFormat.getDirectoryEntry(PEFormat.EXPORTS_INDEX );
+                    Section correspondingSection = peFormat.findSectionByRVA(exportDirectoryEntry.VirtualAddress);
+                    if (correspondingSection != null) {
+                        long offsetInSection = exportDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
+                        long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
+
+                        exportsRowAdder.addRow(exportsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        exportsRowAdder.addRow(exportsPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
+                        exportsRowAdder.addRow(exportsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
+                        exportsRowAdder.addRow(exportsPanel, new JLabel("Size: "), new JLabel(String.valueOf(exportDirectoryEntry.Size)), makeFiller());
+
+                        exportsRowAdder.addSingleComponentWholeRow(exportsPanel, new JSeparator(), new Insets(5, 5, 5, 5));
+
+                        // todo info about export address table, export names table, export ordinals
+                        //peFormat.exports.exportTableEntry.
+
+                        exportsRowAdder.addSingleComponentWholeRow(exportsPanel, new JSeparator(), new Insets(5, 5, 5, 5));
+
+                        DefaultTableModel exportsTableModel = new DefaultTableModel();
+                        exportsTableModel.setColumnIdentifiers(new String[]{"Name RVA", "Name section+offset", "Name", "Export address index", "Export address RVA", "Export address section+offset"});
+
+                        for (int i = 0; i < peFormat.exports.numFunctionEntries(); i++) {
+                            long exportRvaOrForwarderRva = peFormat.exports.getByOrdinal(i).exportRvaOrForwarderRva;
+                            long namePointerRva = peFormat.exports.exportTableEntry.namePointerRva + i * 4;
+                            exportsTableModel.addRow(new String[]{
+                                    String.valueOf(namePointerRva),
+                                    peFormat.findSectionByRVA(namePointerRva).getName() + "+" + String.valueOf(namePointerRva - peFormat.findSectionByRVA(namePointerRva).sectionHeader.virtualAddress),
+                                    peFormat.exports.exportedFunctionNames.get(i),
+                                    String.valueOf(peFormat.exports.exportedFunctionOrdinalIndexes.get(i)),
+                                    String.valueOf(exportRvaOrForwarderRva),
+                                    peFormat.findSectionByRVA(exportRvaOrForwarderRva).getName() + "+" + String.valueOf(exportRvaOrForwarderRva - peFormat.findSectionByRVA(exportRvaOrForwarderRva).sectionHeader.virtualAddress)
+                            });
+                        }
+
+                        JTable exportsTable = new JTable(exportsTableModel);
+
+                        JScrollPane exportsTableScrollPane = new JScrollPane(exportsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+                        exportsTable.setFillsViewportHeight(true);
+
+                        exportsRowAdder.addSingleComponentWholeRow(exportsPanel, exportsTableScrollPane, new Insets(5, 5, 5, 5));
+
+                        exportsRowAdder.addBottomFillerTo(exportsPanel);
+
+                        exportsPanel.setBackground(UIManager.getColor("List.background"));
+                        exportsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                    }
+
+                    contentScrollPane.setViewportView(exportsPanel);
+
                 } else if (path != null && path.getLastPathComponent() == importsNode) {
 
                     JPanel importsPanel = new JPanel();
 
-                    importsPanel.setLayout(new BorderLayout());
+                    importsPanel.setLayout(new GridBagLayout());
 
-                    DefaultTableModel importsTableModel = new DefaultTableModel();
-                    importsTableModel.setColumnIdentifiers(new String[] {"Name RVA", "Name section+offset", "Name", "Import lookup table RVA", "Import lookup table section+offset", "Import address table RVA", "Import address table section+offset"});
+                    GridBagByRowAdder importsRowAdder = new GridBagByRowAdder(col1, col2, col4);
+                    
+                    DirectoryEntry importDirectoryEntry = peFormat.getDirectoryEntry(PEFormat.IMPORTS_INDEX);
+                    Section correspondingSection = peFormat.findSectionByRVA(importDirectoryEntry.VirtualAddress);
+                    if (correspondingSection != null) {
+                        long offsetInSection = importDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
+                        long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
 
-                    for (ImportBlock importEntry : peFormat.imports) {
-                        ImportDirectoryTableEntry importTableEntry = importEntry.importTableEntry;
-                        importsTableModel.addRow(new String[] {
-                                String.valueOf(importTableEntry.nameRva),
-                                peFormat.findByRelativeVirtualAddress(importTableEntry.nameRva).getName() + "+" + String.valueOf(importTableEntry.nameRva - peFormat.findByRelativeVirtualAddress(importTableEntry.nameRva).sectionHeader.virtualAddress),
-                                importEntry.name,
-                                String.valueOf(importTableEntry.importLookupTableRva),
-                                peFormat.findByRelativeVirtualAddress(importTableEntry.importLookupTableRva).getName() + "+" + String.valueOf(importTableEntry.importLookupTableRva - peFormat.findByRelativeVirtualAddress(importTableEntry.importLookupTableRva).sectionHeader.virtualAddress),
-                                String.valueOf(importTableEntry.importAddressTableRva),
-                                peFormat.findByRelativeVirtualAddress(importTableEntry.importAddressTableRva).getName() + "+" + String.valueOf(importTableEntry.importAddressTableRva - peFormat.findByRelativeVirtualAddress(importTableEntry.importAddressTableRva).sectionHeader.virtualAddress),
-                        });
+                        importsRowAdder.addRow(importsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        importsRowAdder.addRow(importsPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
+                        importsRowAdder.addRow(importsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
+                        importsRowAdder.addRow(importsPanel, new JLabel("Size: "), new JLabel(String.valueOf(importDirectoryEntry.Size)), makeFiller());
+
+                        importsRowAdder.addSingleComponentWholeRow(importsPanel, new JSeparator(), new Insets(5, 5, 5, 5));
+
+                        DefaultTableModel importsTableModel = new DefaultTableModel();
+                        importsTableModel.setColumnIdentifiers(new String[]{"Name RVA", "Name section+offset", "Name", "Import lookup table RVA", "Import lookup table section+offset", "Import address table RVA", "Import address table section+offset"});
+
+                        for (ImportBlock importEntry : peFormat.imports) {
+                            ImportDirectoryTableEntry importTableEntry = importEntry.importTableEntry;
+                            importsTableModel.addRow(new String[]{
+                                    String.valueOf(importTableEntry.nameRva),
+                                    peFormat.findSectionByRVA(importTableEntry.nameRva).getName() + "+" + String.valueOf(importTableEntry.nameRva - peFormat.findSectionByRVA(importTableEntry.nameRva).sectionHeader.virtualAddress),
+                                    importEntry.name,
+                                    String.valueOf(importTableEntry.importLookupTableRva),
+                                    peFormat.findSectionByRVA(importTableEntry.importLookupTableRva).getName() + "+" + String.valueOf(importTableEntry.importLookupTableRva - peFormat.findSectionByRVA(importTableEntry.importLookupTableRva).sectionHeader.virtualAddress),
+                                    String.valueOf(importTableEntry.importAddressTableRva),
+                                    peFormat.findSectionByRVA(importTableEntry.importAddressTableRva).getName() + "+" + String.valueOf(importTableEntry.importAddressTableRva - peFormat.findSectionByRVA(importTableEntry.importAddressTableRva).sectionHeader.virtualAddress),
+                            });
+                        }
+
+                        JTable importsTable = new JTable(importsTableModel);
+
+                        JScrollPane importsTableScrollPane = new JScrollPane(importsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+                        importsTable.setFillsViewportHeight(true);
+
+                        importsRowAdder.addSingleComponentWholeRow(importsPanel, importsTableScrollPane, new Insets(5, 5, 5, 5));
+
+                        importsRowAdder.addBottomFillerTo(importsPanel);
+
+                        importsPanel.setBackground(UIManager.getColor("List.background"));
+                        importsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
                     }
-
-                    JTable importsTable = new JTable(importsTableModel);
-
-                    JScrollPane importsTableScrollPane = new JScrollPane(importsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
-                    importsTable.setFillsViewportHeight(true);
-
-                    importsPanel.add(importsTableScrollPane, BorderLayout.CENTER);
-
-
-                    importsPanel.setBackground(UIManager.getColor("List.background"));
-                    importsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
 
                     contentScrollPane.setViewportView(importsPanel);
                     
                 } else if (path != null && importBlockNodes.containsKey(path.getLastPathComponent())) {
-                    ImportBlock section = importBlockNodes.get(path.getLastPathComponent());
+                    ImportBlock importBlock = importBlockNodes.get(path.getLastPathComponent());
 
                     JPanel importBlockPanel = new JPanel();
 
-                    importBlockPanel.setLayout(new BorderLayout());
+                    importBlockPanel.setLayout(new GridBagLayout());
+
+                    GridBagByRowAdder importFunctionsRowAdder = new GridBagByRowAdder(col1, col2, col4);
+
+                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Name: "), new JLabel(importBlock.name), makeFiller());
+                    ImportDirectoryTableEntry importTableEntry = importBlock.importTableEntry;
+                    Section lookupTableSection = peFormat.findSectionByRVA(importTableEntry.importLookupTableRva);
+                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table section + offset: "), new JLabel(lookupTableSection.getName() + "+" + String.valueOf(importTableEntry.importLookupTableRva - lookupTableSection.sectionHeader.virtualAddress)), makeFiller());
+                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table num entries: "), new JLabel(String.valueOf(importBlock.numEntries())), makeFiller());
+                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table size: "), new JLabel(String.valueOf(importBlock.sizeInBytes())), makeFiller());
+                    Section addressTableSection = peFormat.findSectionByRVA(importTableEntry.importAddressTableRva);
+                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import address table section + offset: "), new JLabel(addressTableSection.getName() + "+" + String.valueOf(importTableEntry.importAddressTableRva - addressTableSection.sectionHeader.virtualAddress)), makeFiller());
 
                     DefaultTableModel importedFunctionsTableModel = new DefaultTableModel();
-                    importedFunctionsTableModel.setColumnIdentifiers(new String[] {"Name"});
+                    importedFunctionsTableModel.setColumnIdentifiers(new String[]{"Name"});
 
-                    // TODO replace this with detiled data with ordinal/name indicator
-                    List<String> importedFunctions = section.resolvedImportedFunctions;
-                    for (String importedFunction: importedFunctions) {
-                        importedFunctionsTableModel.addRow(new String[] { 
+                    // TODO replace this with detailed data with ordinal/name indicator
+                    List<String> importedFunctions = importBlock.resolvedImportedFunctions;
+                    for (String importedFunction : importedFunctions) {
+                        importedFunctionsTableModel.addRow(new String[]{
                                 importedFunction
                         });
                     }
@@ -922,38 +1084,146 @@ public class VisualPE {
                     JScrollPane importedFunctionsTableScrollPane = new JScrollPane(importedFunctionsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
                     importedFunctionsTable.setFillsViewportHeight(true);
 
-                    importBlockPanel.add(importedFunctionsTableScrollPane, BorderLayout.CENTER);
-
+                    importFunctionsRowAdder.addSingleComponentWholeRow(importBlockPanel, importedFunctionsTableScrollPane, new Insets(5, 5, 5, 5));
+                    
+                    importFunctionsRowAdder.addBottomFillerTo(importBlockPanel);
 
                     importBlockPanel.setBackground(UIManager.getColor("List.background"));
                     importBlockPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
 
                     contentScrollPane.setViewportView(importBlockPanel);
-                    
 
+                } else if (path != null && path.getLastPathComponent() == relocationsNode) {
+
+                    JPanel relocationsPanel = new JPanel();
+
+                    relocationsPanel.setLayout(new GridBagLayout());
+
+                    GridBagByRowAdder relocationsRowAdder = new GridBagByRowAdder(col1, col2, col4);
+
+                    DirectoryEntry relocsDirectoryEntry = peFormat.getDirectoryEntry(PEFormat.RELOCS_INDEX);
+                    Section correspondingSection = peFormat.findSectionByRVA(relocsDirectoryEntry.VirtualAddress);
+                    if (correspondingSection != null) {
+                        long offsetInSection = relocsDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
+                        long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
+
+                        relocationsRowAdder.addRow(relocationsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        relocationsRowAdder.addRow(relocationsPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
+                        relocationsRowAdder.addRow(relocationsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
+                        relocationsRowAdder.addRow(relocationsPanel, new JLabel("Size: "), new JLabel(String.valueOf(relocsDirectoryEntry.Size)), makeFiller());
+                        relocationsRowAdder.addRow(relocationsPanel, new JLabel("Number of blocks "), new JLabel(String.valueOf(peFormat.baseRelocations.size())), makeFiller());
+
+                        relocationsRowAdder.addBottomFillerTo(relocationsPanel);
+
+                        relocationsPanel.setBackground(UIManager.getColor("List.background"));
+                        relocationsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                    }
+
+                    contentScrollPane.setViewportView(relocationsPanel);
+                    
+                } else if (path != null && relocationsBlockNodes.containsKey(path.getLastPathComponent())) {
+
+                    JPanel relocationsBlockPanel = new JPanel();
+
+                    relocationsBlockPanel.setLayout(new GridBagLayout());
+
+                    GridBagByRowAdder relocationsBlockRowAdder = new GridBagByRowAdder(col1, col2, col4);
+                    
+                    BaseRelocationsBlock block = relocationsBlockNodes.get(path.getLastPathComponent());
+                    Section correspondingSection = peFormat.findSectionByRVA(block.pageRva);
+                    if (correspondingSection != null) {
+                        long offsetInSection = block.pageRva - correspondingSection.sectionHeader.virtualAddress;
+                        long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
+
+                        relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Page RVA: "), new JLabel(String.valueOf(block.pageRva)), makeFiller());
+                        relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
+                        relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
+                        relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Size: "), new JLabel(String.valueOf(block.getSize())), makeFiller());
+                        relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Number of entries "), new JLabel(String.valueOf(block.entries.size())), makeFiller());
+
+                        relocationsBlockRowAdder.addBottomFillerTo(relocationsBlockPanel);
+
+                        relocationsBlockPanel.setBackground(UIManager.getColor("List.background"));
+                        relocationsBlockPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                    }
+
+                    contentScrollPane.setViewportView(relocationsBlockPanel);
+                    
+                    
                 } else if (path != null && path.getLastPathComponent() == sectionsNode) {
 
                     JPanel sectionsDataOverviewPanel = new JPanel();
 
                     sectionsDataOverviewPanel.setLayout(new BorderLayout());
 
-                    DefaultTableModel sectionsTableModel = new DefaultTableModel();
+                    DefaultTableModel sectionsTableModel = new DefaultTableModel() {
+                        @Override
+                        public boolean isCellEditable(int row, int column) {
+                            return false;
+                        }
+                    };
                     sectionsTableModel.setColumnIdentifiers(new String[] {"Name", "Offset in file", "Size in file", "End in file", "Start RVA", "Virtual size", "End RVA"});
-                    
-                    for (Section section : peFormat.sections) {
-                        sectionsTableModel.addRow(new String[] {
-                                section.getName(),
-                                String.valueOf(section.getOffsetInFile()),
-                                String.valueOf(section.getSizeInFile()),
-                                String.valueOf(section.getOffsetInFile() + section.getSizeInFile()),
-                                String.valueOf(section.sectionHeader.virtualAddress),
-                                String.valueOf(section.sectionHeader.physicalAddressOrVirtualSize),
-                                String.valueOf(section.sectionHeader.virtualAddress + section.sectionHeader.physicalAddressOrVirtualSize)
-                        });
-                    }
+                    refreshSectionsOverviewTable(sectionsTableModel, peFormat, displayFormatMap);
                     
                     JTable sectionsLayoutTable = new JTable(sectionsTableModel);
+                    sectionsLayoutTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+                    {
+                        JPopupMenu popup = new JPopupMenu();
+
+                        // instead of sectionsLayoutTable.setComponentPopupMenu(popup) we will provide our own mouse listener,
+                        // which will select row and cell even for right-click before showing context popup menu
+                        sectionsLayoutTable.addMouseListener(new MouseAdapter() {
+                            
+                            @Override
+                            public void mouseReleased(MouseEvent e) {
+                                
+                                int r = sectionsLayoutTable.rowAtPoint(e.getPoint());
+                                if (r >= 0 && r < sectionsLayoutTable.getRowCount()) {
+                                    if (!sectionsLayoutTable.isRowSelected(r)) {
+                                        int c = sectionsLayoutTable.columnAtPoint(e.getPoint());
+                                        if (c >= 0 && c < sectionsLayoutTable.getColumnCount()) {
+                                            sectionsLayoutTable.changeSelection(r, c, false, false);
+                                        } else {
+                                            sectionsLayoutTable.clearSelection();
+                                        }
+                                    }
+                                } else {
+                                    sectionsLayoutTable.clearSelection();
+                                }
+
+                                if (sectionsLayoutTable.getSelectedRow() < 0) {
+                                    return;
+                                }
+                                if (e.isPopupTrigger()) {
+                                    popup.show(e.getComponent(), e.getX(), e.getY());
+                                }
+                            }
+                        });
+                        
+                        popup.addPopupMenuListener(new PopupMenuListener() {
+
+                            private JMenu formats;
+
+                            @Override
+                            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                                formats = addTableDisplayFormatsMenu(columnName(sectionsTableModel,sectionsLayoutTable.getSelectedColumn()), "SECTIONS_", displayFormatMap, sectionsTableModel);
+                                popup.add(formats);
+                            }
+
+                            @Override
+                            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                                popup.remove(formats);
+                            }
+
+                            @Override
+                            public void popupMenuCanceled(PopupMenuEvent e) {
+                            }
+                        });
+
+                    }
 
                     JScrollPane sectionsTableScrollPane = new JScrollPane(sectionsLayoutTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
                     sectionsLayoutTable.setFillsViewportHeight(true);
@@ -1007,25 +1277,115 @@ public class VisualPE {
 
                     contentScrollPane.setViewportView(sectionDataOverviewPanel);
                     
+                } else if (path != null && path.getLastPathComponent() == resourcesRootNode) {
+
+                    JPanel resourcesPanel = new JPanel();
+
+                    resourcesPanel.setLayout(new GridBagLayout());
+
+                    GridBagByRowAdder resourcesRowAdder = new GridBagByRowAdder(col1, col2, col4);
+
+                    DirectoryEntry resourcesDirectoryEntry = peFormat.getDirectoryEntry(PEFormat.RESOURCES_INDEX);
+                    Section correspondingSection = peFormat.findSectionByRVA(resourcesDirectoryEntry.VirtualAddress);
+                    if (correspondingSection != null) {
+                        long offsetInSection = resourcesDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
+                        long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
+
+                        resourcesRowAdder.addRow(resourcesPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        resourcesRowAdder.addRow(resourcesPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
+                        resourcesRowAdder.addRow(resourcesPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
+                        resourcesRowAdder.addRow(resourcesPanel, new JLabel("Size: "), new JLabel(String.valueOf(resourcesDirectoryEntry.Size)), makeFiller());
+
+                        resourcesRowAdder.addSingleComponentWholeRow(resourcesPanel, new JSeparator(), new Insets(5, 5, 5, 5));
+
+                        resourcesRowAdder.addBottomFillerTo(resourcesPanel);
+
+                        resourcesPanel.setBackground(UIManager.getColor("List.background"));
+                        resourcesPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                    }
+
+
+                    contentScrollPane.setViewportView(resourcesPanel);
+                    
                 }
                 
             }
 
-            public JMenuItem addFieldInfoMenu(final IntrospectableFormat header, final String fieldName, int formatStartOffset, final Map<Object, DisplayFormat> displayFormatMap) {
+            public void refreshSectionsOverviewTable(DefaultTableModel tableModel, PEFormat peFormat, Map<Object, DisplayFormat> displayFormatMap) {
+                tableModel.setNumRows(0);
+                String prefix = "SECTIONS_";
+                for (Section section : peFormat.sections) {
+                    tableModel.addRow(new String[] {
+                            section.getName(),
+                            getDecAndHexStr(section.getOffsetInFile(), displayFormatMap.getOrDefault(prefix + columnName(tableModel, 1), DisplayFormat.DEFAULT)),
+                            getDecAndHexStr(section.getSizeInFile(), displayFormatMap.getOrDefault(prefix + columnName(tableModel, 2), DisplayFormat.DEFAULT)),
+                            getDecAndHexStr(section.getOffsetInFile() + section.getSizeInFile(), displayFormatMap.getOrDefault(prefix + columnName(tableModel, 3), DisplayFormat.DEFAULT)),
+                            getDecAndHexStr(section.sectionHeader.virtualAddress, displayFormatMap.getOrDefault(prefix + columnName(tableModel, 4), DisplayFormat.DEFAULT)),
+                            getDecAndHexStr(section.sectionHeader.physicalAddressOrVirtualSize, displayFormatMap.getOrDefault(prefix + columnName(tableModel, 5), DisplayFormat.DEFAULT)),
+                            getDecAndHexStr(section.sectionHeader.virtualAddress + section.sectionHeader.physicalAddressOrVirtualSize, displayFormatMap.getOrDefault(prefix + columnName(tableModel, 6), DisplayFormat.DEFAULT))
+                    });
+                }
+            }
+
+            public String columnName(DefaultTableModel sectionsTableModel, int index) {
+                return sectionsTableModel.getColumnName(index).toLowerCase().replace(' ','_');
+            }
+
+            public JMenuItem addFieldInfoMenu(final IntrospectableFormat header, final String fieldName, int formatStartOffset, String prefix, final Map<Object, DisplayFormat> displayFormatMap) {
                 JMenuItem fieldInfoItem = new JMenuItem("Field info...");
 
                 fieldInfoItem.setAction(new AbstractAction("Field info...") {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        showFieldInfoDialog(header, fieldName, formatStartOffset, displayFormatMap);
+                        showFieldInfoDialog(header, fieldName, formatStartOffset, prefix, displayFormatMap);
                     }
                 });
 
                 return fieldInfoItem;
             }
 
+            public JMenu addTableDisplayFormatsMenu(final String fieldName, String prefix, final Map<Object, DisplayFormat> displayFormatMap, DefaultTableModel sectionsTableModel) {
+                JMenu subMenu = new JMenu("Display column as");
+                DisplayFormat[] displayFormats = new DisplayFormat[] {DisplayFormat.DEFAULT, DisplayFormat.DEC_NUMBER, DisplayFormat.HEX_NUMBER};
 
-            public JMenu addDisplayFormatsMenu(final IntrospectableFormat header, final String fieldName, final JTextField valueTextField, final Map<Object, DisplayFormat> displayFormatMap) {
+                for (DisplayFormat displayFormat : displayFormats) {
+                    JCheckBoxMenuItem menuItem = new JCheckBoxMenuItem(new AbstractAction(displayFormat.name()) {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            displayFormatMap.put(prefix + fieldName, displayFormat);
+                            refreshSectionsOverviewTable(sectionsTableModel, peFormat, displayFormatMap);
+                        }
+                    });
+                    subMenu.add(menuItem);
+
+
+                }
+
+                subMenu.addMenuListener(new MenuListener() {
+                    @Override
+                    public void menuSelected(MenuEvent e) {
+
+                        DisplayFormat lastSelection = displayFormatMap.getOrDefault(prefix + fieldName, DisplayFormat.DEFAULT);
+
+                        for (int i = 0; i < subMenu.getItemCount(); i++) {
+                            JCheckBoxMenuItem menuItem = (JCheckBoxMenuItem)subMenu.getItem(i);
+                            menuItem.setState(lastSelection.name().equals(menuItem.getText()));
+                        }
+
+                    }
+
+                    @Override
+                    public void menuDeselected(MenuEvent e) {
+                    }
+
+                    @Override
+                    public void menuCanceled(MenuEvent e) {
+                    }
+                });
+                return subMenu;
+            }
+
+            public JMenu addDisplayFormatsMenu(final IntrospectableFormat header, final String fieldName, final JTextField valueTextField, String prefix, final Map<Object, DisplayFormat> displayFormatMap) {
                 JMenu subMenu = new JMenu("Display as");
                 DisplayFormat[] displayFormats = IntrospectableFormat.filterSupported(header, fieldName, DisplayFormat.values());
                 
@@ -1033,7 +1393,7 @@ public class VisualPE {
                     JCheckBoxMenuItem menuItem = new JCheckBoxMenuItem(new AbstractAction(displayFormat.name()) {
                         @Override
                         public void actionPerformed(ActionEvent e) {
-                            displayFormatMap.put(fieldName, displayFormat);
+                            displayFormatMap.put(prefix + fieldName, displayFormat);
                             valueTextField.setText(header.getStringValue(fieldName, displayFormat).get());
                         }
                     });
@@ -1046,7 +1406,7 @@ public class VisualPE {
                     @Override
                     public void menuSelected(MenuEvent e) {
 
-                        DisplayFormat lastSelection = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
+                        DisplayFormat lastSelection = displayFormatMap.getOrDefault(prefix + fieldName, DisplayFormat.DEFAULT);
                         
                         for (int i = 0; i < subMenu.getItemCount(); i++) {
                             JCheckBoxMenuItem menuItem = (JCheckBoxMenuItem)subMenu.getItem(i);
@@ -1057,19 +1417,16 @@ public class VisualPE {
 
                     @Override
                     public void menuDeselected(MenuEvent e) {
-                        
-
                     }
 
                     @Override
                     public void menuCanceled(MenuEvent e) {
-
                     }
                 });
                 return subMenu;
             }
 
-            public void showFieldInfoDialog(IntrospectableFormat format, String fieldName, int formatOffset, final Map<Object, DisplayFormat> displayFormatMap) {
+            public void showFieldInfoDialog(IntrospectableFormat format, String fieldName, int formatOffset, String prefix, final Map<Object, DisplayFormat> displayFormatMap) {
                 JDialog dialog = new JDialog(frame, "Field info");
 
                 JPanel fieldInfoPanel = new JPanel();
@@ -1084,14 +1441,15 @@ public class VisualPE {
                 JTextField sizeText = new JTextField(String.valueOf(format.getSize(fieldName)), 20);
                 sizeText.setEditable(false);
                 fieldInfoAdder.addRow(fieldInfoPanel, new JLabel("Field size: "), sizeText, makeFiller());
-                JTextField offsetText = new JTextField(String.valueOf(format.getOffset(fieldName) + formatOffset), 20);
+                int fieldAbsOffset = format.getOffset(fieldName) + formatOffset;
+                JTextField offsetText = new JTextField(String.valueOf(fieldAbsOffset) + " (" + "0x" + Long.toHexString(fieldAbsOffset) + ")", 20);
                 offsetText.setEditable(false);
                 fieldInfoAdder.addRow(fieldInfoPanel, new JLabel("Field offset from start of file: "), offsetText, makeFiller());
                 
                 fieldInfoAdder.addSingleComponentWholeRow(fieldInfoPanel, new JSeparator(), new Insets(5, 5, 5, 5));
 
                 JComboBox<DisplayFormat> displayFormatComboBox = new JComboBox<>(new DefaultComboBoxModel<DisplayFormat>(IntrospectableFormat.filterSupported(format, fieldName, DisplayFormat.values())));
-                DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
+                DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(prefix + fieldName, DisplayFormat.DEFAULT);
                 displayFormatComboBox.setSelectedItem(selectedDisplayFormat);
                 fieldInfoAdder.addRow(fieldInfoPanel, new JLabel("Field format: "), displayFormatComboBox, makeFiller());
 
@@ -1134,14 +1492,166 @@ public class VisualPE {
 
     }
 
+    public String getDecAndHexStr(long val) {
+        return getDecAndHexStr(val, DisplayFormat.DEFAULT);
+    }
+
+    public String getDecAndHexStr(long val, DisplayFormat format) {
+        if (format == DisplayFormat.DEFAULT) {
+            return String.valueOf(val) + " (" + "0x" + Long.toHexString(val) + ") ";
+        } else if (format == DisplayFormat.DEC_NUMBER) {
+            return String.valueOf(val);
+        } else if (format == DisplayFormat.HEX_NUMBER) {
+            return "0x" + Long.toHexString(val);
+        } else {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    public void createLIBFormatRenderer(Map<Object, DisplayFormat> displayFormatMap,  ARFormat arFormat, SeekableByteChannel fileChannel) {
+
+
+
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+
+        DefaultMutableTreeNode libNode = new DefaultMutableTreeNode("LIB");
+        root.add(libNode);
+
+        IdentityHashMap<DefaultMutableTreeNode, Integer> fileNodes = new IdentityHashMap<>();
+        for (int i = 0; i < arFormat.itemHeaders.size(); i++ ) {
+            ARFormat.FileHeader item = arFormat.itemHeaders.get(i);
+            String name = item.fileIdentifier;
+            DefaultMutableTreeNode fileNode = new DefaultMutableTreeNode(name);
+            fileNodes.put(fileNode, i);
+            libNode.add(fileNode);
+        }
+
+        treeModel.reload();
+
+        tree.addTreeSelectionListener(new TreeSelectionListener() {
+            @Override
+            public void valueChanged(TreeSelectionEvent e) {
+                TreePath path = e.getNewLeadSelectionPath();
+
+                if (path != null && path.getLastPathComponent() == libNode) {
+
+                    JPanel libInfoPanel = new JPanel();
+
+                    libInfoPanel.setLayout(new GridBagLayout());
+
+                    GridBagByRowAdder libraryAdder = new GridBagByRowAdder(col1, col2, col4);
+
+//                    int dosTotalSize = (dosHeader.nBlocks - 1) * 512 + dosHeader.lastSize;
+//                    dosInfoAdder.addRow(libInfoPanel, new JLabel("DOS header size: "), new JLabel(String.valueOf(dosHeader.getDeclaredHeaderSize())), makeFiller());
+//                    dosInfoAdder.addRow(libInfoPanel, new JLabel("DOS payload size: "), new JLabel(String.valueOf(dosTotalSize - dosHeader.getDeclaredHeaderSize())), makeFiller());
+//                    dosInfoAdder.addRow(libInfoPanel, new JLabel("DOS exe total size: "), new JLabel(String.valueOf(dosTotalSize)), makeFiller());
+
+                    libraryAdder.addBottomFillerTo(libInfoPanel);
+                    libInfoPanel.setBackground(UIManager.getColor("List.background"));
+
+                    libInfoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+                    contentScrollPane.setViewportView(libInfoPanel);
+
+                    
+                } else if (path != null && fileNodes.containsKey(path.getLastPathComponent()) )  {
+
+                    JPanel libraryEntryPanel = new JPanel();
+                    libraryEntryPanel.setLayout(new GridBagLayout());
+                    GridBagByRowAdder libraryEntryAdder = new GridBagByRowAdder(col1, col2, col4);
+                    
+                    try {
+                        int fileIndex = fileNodes.get(path.getLastPathComponent());
+                        long dataOffset = arFormat.itemDataOffsets.get(fileIndex);
+                        int dataSize = arFormat.itemHeaders.get(fileIndex).fileSize;
+
+                        ByteBuffer fileData = ByteBuffer.allocate(dataSize);
+                        fileChannel.position(dataOffset);
+                        fileChannel.read(fileData);
+                        fileData.flip();
+                        COFFHeader coffHeader = new COFFHeader();
+                        coffHeader.readFrom(fileData);
+                        
+                        if (ImportHeader.canBeCreatedFrom(coffHeader)) {
+                            fileData.clear();
+                            ImportFormat importFormat = new ImportFormat();
+                            importFormat.readFrom(fileData);
+
+                            for (String fieldName : new String[] {ImportHeader.Field.SIZE_OF_DATA.name(), ImportHeader.Field.ORDINAL_OR_HINT.name(), ImportHeader.Field.IMPORT_TYPE.name(), ImportHeader.Field.NAME_TYPE.name()}) {
+
+                                JLabel nameLabel = new JLabel(fieldName + ":");
+
+                                String tooltipText = "<html>Offset:" + importFormat.header.getOffset(fieldName) + "<br>" + "Size:" + importFormat.header.getSize(fieldName) + "</html>";
+
+                                nameLabel.setToolTipText(tooltipText);
+
+                                // JLabel offsetLabel = new JLabel("(offset:" + format.coffHeader.getOffset(fieldName) + ";" + "size:" + format.coffHeader.getSize(fieldName) + ")");
+                                // JLabel valueLabel = new JLabel(format.header.getStringValue(fieldName));
+                                DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
+                                JTextField valueTextField = new JTextField(importFormat.header.getStringValue(fieldName, selectedDisplayFormat).get(), 30);
+                                // valueTextField.setEnabled(false);
+                                valueTextField.setEditable(false);
+                                valueTextField.setToolTipText(tooltipText);
+
+//                                {
+//                                    JPopupMenu popup = new JPopupMenu();
+//                                    valueTextField.setComponentPopupMenu(popup);
+//
+//                                    JMenuItem fieldInfoItem = addFieldInfoMenu(coffHeader, fieldName, (int) peFormat.getCOFFHeaderOffset(), displayFormatMap);
+//                                    popup.add(fieldInfoItem);
+//
+//                                    JMenu subMenu = addDisplayFormatsMenu(coffHeader, fieldName, valueTextField, displayFormatMap);
+//                                    popup.add(subMenu);
+//
+//                                }
+
+                                libraryEntryAdder.addRow(libraryEntryPanel, nameLabel, valueTextField, makeFiller());
+
+                            }
+                            
+                            JTextField dllNameField = new JTextField(importFormat.dllName, 30);
+                            // dllNameField.setEnabled(false);
+                            dllNameField.setEditable(false);
+
+                            JTextField importedSymbolField = new JTextField(importFormat.importedSymbol, 30);
+                            // importedSymbolField.setEnabled(false);
+                            importedSymbolField.setEditable(false);
+
+
+
+                            libraryEntryAdder.addRow(libraryEntryPanel, new JLabel("DLL name: "), dllNameField, makeFiller());
+                            libraryEntryAdder.addRow(libraryEntryPanel, new JLabel("Function name: "), importedSymbolField, makeFiller());
+                            
+                        }
+
+                        libraryEntryAdder.addBottomFillerTo(libraryEntryPanel);
+                        libraryEntryPanel.setBackground(UIManager.getColor("List.background"));
+
+                        libraryEntryPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+                        contentScrollPane.setViewportView(libraryEntryPanel);
+                        
+                        
+                    } catch (Exception ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            }
+        });
+
+
+    }
+
     public void processChildren(ResourceEntry directory, DefaultMutableTreeNode directoryNode, IdentityHashMap<DefaultMutableTreeNode, ResourceEntry> resourceDirectoryNodes, int level) {
-        for (ResourceEntry entry : directory.resolvedSubDirectory.entries) {
-            String name = entry.resolvedName != null ? entry.resolvedName : ((level == 1) && (ResourceDirectory.ResourceType.findById(entry.directoryEntry.integerID) != null) ? (ResourceDirectory.ResourceType.findById(entry.directoryEntry.integerID).name()) : String.valueOf(entry.directoryEntry.integerID));
-            DefaultMutableTreeNode entryNode = new DefaultMutableTreeNode(name);
-            resourceDirectoryNodes.put(entryNode, entry);
-            directoryNode.add(entryNode);
-            if (entry.resolvedSubDirectory != null) {
-                processChildren(entry, entryNode, resourceDirectoryNodes, level + 1);
+        if (directory.directoryEntry != null) {
+            for (ResourceEntry entry : directory.resolvedSubDirectory.entries) {
+                String name = entry.resolvedName != null ? entry.resolvedName : ((level == 1) && (ResourceDirectory.ResourceType.findById(entry.directoryEntry.integerID) != null) ? (ResourceDirectory.ResourceType.findById(entry.directoryEntry.integerID).name()) : String.valueOf(entry.directoryEntry.integerID));
+                DefaultMutableTreeNode entryNode = new DefaultMutableTreeNode(name);
+                resourceDirectoryNodes.put(entryNode, entry);
+                directoryNode.add(entryNode);
+                if (entry.resolvedSubDirectory != null) {
+                    processChildren(entry, entryNode, resourceDirectoryNodes, level + 1);
+                }
             }
         }
     }

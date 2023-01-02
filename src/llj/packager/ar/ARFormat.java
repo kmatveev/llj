@@ -7,7 +7,7 @@ import llj.util.ReadException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,14 +16,12 @@ public class ARFormat implements Format {
 
     private byte[] signature;
 
-    public static final Charset ASCII = Charset.forName("ASCII");
-
-    private static final byte[] SIGNATURE = "!<arch>\n".getBytes(ASCII);
+    private static final byte[] SIGNATURE = "!<arch>\n".getBytes(StandardCharsets.US_ASCII);
 
     public List<FileHeader> itemHeaders = new ArrayList<>();
     public List<Long> itemDataOffsets = new ArrayList<>();
 
-    public void readFrom(SeekableByteChannel in) throws Exception {
+    public void readFrom(SeekableByteChannel in) throws Exception  {
         signature = BinIOTools.getBytes(in, SIGNATURE.length);
 
         boolean hasNext = true;
@@ -102,7 +100,7 @@ public class ARFormat implements Format {
                 }
             }
             if (i > begin) {
-                result.add(new String(raw, begin, i - begin, ASCII));
+                result.add(new String(raw, begin, i - begin, StandardCharsets.US_ASCII));
                 while (i < raw.length && raw[i] == '\n') {
                     i++;
                 }
@@ -125,7 +123,7 @@ public class ARFormat implements Format {
 
         public void readFrom(SeekableByteChannel in) throws ReadException, ARFormatException, IOException {
             try {
-                fileIdentifier = new String(BinIOTools.getBytes(in, 16), ASCII);
+                fileIdentifier = new String(BinIOTools.getBytes(in, 16), StandardCharsets.US_ASCII);
             } catch (Exception e) {
                 throw new ARFormatException("File identifier error", e);
             }
@@ -167,7 +165,7 @@ public class ARFormat implements Format {
         }
 
         private static Integer readInt(SeekableByteChannel in, int length) throws ReadException {
-            String strVal = new String(BinIOTools.getBytes(in, length), ASCII).trim();
+            String strVal = new String(BinIOTools.getBytes(in, length), StandardCharsets.US_ASCII).trim();
             if (strVal.length() == 0) {
                 return null;
             } else {

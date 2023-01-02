@@ -2,7 +2,7 @@ package llj.asm.bytecode.exec;
 
 import llj.asm.bytecode.TypeType;
 
-public class OpaqueSingleSizeValue extends Value {
+public final class OpaqueSingleSizeValue extends Value {
 
     public int word;
 

@@ -36,7 +36,7 @@ public class LongConstant<E> extends Constant<E> {
 
     @Override
     public int writeTo(WritableByteChannel bb) throws IOException {
-        putLong(bb, value);
+        putLong(bb, value, ByteOrder.BIG_ENDIAN);
         return SIZE_LONG;
     }
 

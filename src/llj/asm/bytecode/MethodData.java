@@ -232,7 +232,7 @@ public class MethodData extends ClassMemberData {
     public static int localVarSlotsFor(List<Type> params) {
         int i = 0;
         for (Type paramType : params) {
-            i += TypeType.size(paramType.type);  // some vars (of long and double types) occupy two slots in local var tables
+            i += paramType.type.size();  // some vars (of long and double types) occupy two slots in local var tables
         }
         return i;
     }

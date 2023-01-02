@@ -2,6 +2,7 @@ package llj.asm.bytecode;
 
 import llj.packager.jclass.constants.ClassRefConstant;
 import llj.packager.jclass.FormatException;
+import llj.packager.jclass.constants.ResolveException;
 import llj.util.ref.StringReference;
 
 public class ClassReference extends StringReference<ClassData> {
@@ -15,7 +16,7 @@ public class ClassReference extends StringReference<ClassData> {
         this.direct = obj;
     }
 
-    public static ClassReference make(ClassRefConstant<ClassReference> classRef) throws FormatException {
+    public static ClassReference make(ClassRefConstant<ClassReference> classRef) throws ResolveException {
         ClassReference shortcut = classRef.getShortcut();
         if (shortcut != null) {
             return shortcut;

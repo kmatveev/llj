@@ -31,7 +31,7 @@ public class RefType extends Type {
                     return true;
                 } else {
                     try {
-                        return classRef.equals(anotherRef.classRef) || anotherRef.classRef.get().isSameOrSubClassOf(classRef.get());
+                        return classRef.equals(anotherRef.classRef) || ((anotherRef.classRef != null) && anotherRef.classRef.get().isSameOrSubClassOf(classRef.get()));
                     } catch (UnresolvedReference e) {
                         throw new ClassesNotLoadedException(classRef, anotherRef.classRef);
                     }
@@ -52,7 +52,7 @@ public class RefType extends Type {
     public String toCode() {
         switch (type) {
             case REF:
-                return classRef.isResolved() ? classRef.get().name : String.valueOf(classRef.id);
+                return classRef == null ? "AnyRef" : classRef.isResolved() ? classRef.get().name : String.valueOf(classRef.id);
             default:
                 throw new RuntimeException("Unknown type:" + type.name());
         }

@@ -7,6 +7,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import static llj.util.BinIOTools.SIZE_SHORT;
 import static llj.util.BinIOTools.getBytes;
@@ -34,7 +35,7 @@ public class StringConstant extends Constant {
             int length = getUnsignedShort(bb, ByteOrder.BIG_ENDIAN);
             location = "content";
             byte[] data = getBytes(bb, length);
-            String value = new String(data, Charset.forName("UTF-8"));
+            String value = new String(data, StandardCharsets.UTF_8);
             return new StringConstant(value);
         } catch (ReadException e) {
             throw new ReadException("Was unable to read a " + location + " part of StringConstant", e);
@@ -43,7 +44,7 @@ public class StringConstant extends Constant {
 
     @Override
     public int writeTo(WritableByteChannel bb) throws IOException {
-        byte[] data = value.getBytes(Charset.forName("UTF-8"));
+        byte[] data = value.getBytes(StandardCharsets.UTF_8);
         putUnsignedShort(bb, data.length, ByteOrder.BIG_ENDIAN);
         putBytes(bb, data);
         return SIZE_SHORT + data.length;

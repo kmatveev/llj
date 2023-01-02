@@ -30,11 +30,11 @@ public class COFFHeader extends FieldSequenceFormat {
     public static enum Field implements FieldSequenceFormat.Field<COFFHeader>{
         MACHINE {
             public void read(ByteBuffer source, COFFHeader dest) {
-                dest.machine = getUnsignedShort(source);
+                dest.machine = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFHeader source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.machine);
+                putUnsignedShort(dest, source.machine, ByteOrder.LITTLE_ENDIAN);
             }
             
             public int size() { return WORD; }
@@ -50,11 +50,11 @@ public class COFFHeader extends FieldSequenceFormat {
         },
         NUMBER_OF_SECTIONS {
             public void read(ByteBuffer source, COFFHeader dest) {
-                dest.numberOfSections = getUnsignedShort(source);
+                dest.numberOfSections = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFHeader source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.numberOfSections);
+                putUnsignedShort(dest, source.numberOfSections, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }
@@ -66,11 +66,11 @@ public class COFFHeader extends FieldSequenceFormat {
         },
         TIME_DATE_STAMP {
             public void read(ByteBuffer source, COFFHeader dest) {
-                dest.timeDateStamp = getUnsignedInt(source);
+                dest.timeDateStamp = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFHeader source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.timeDateStamp);
+                putUnsignedInt(dest, source.timeDateStamp, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return DWORD; }
@@ -82,11 +82,11 @@ public class COFFHeader extends FieldSequenceFormat {
         },
         POINTER_TO_SYMBOL_TABLE {
             public void read(ByteBuffer source, COFFHeader dest) {
-                dest.pointerToSymbolTable = getUnsignedInt(source);
+                dest.pointerToSymbolTable = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFHeader source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.pointerToSymbolTable);
+                putUnsignedInt(dest, source.pointerToSymbolTable, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return DWORD; }
@@ -98,11 +98,11 @@ public class COFFHeader extends FieldSequenceFormat {
         },
         NUMBER_OF_SYMBOLS {
             public void read(ByteBuffer source, COFFHeader dest) {
-                dest.numberOfSymbols = getUnsignedInt(source);
+                dest.numberOfSymbols = getUnsignedInt(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFHeader source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.numberOfSymbols);
+                putUnsignedInt(dest, source.numberOfSymbols, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return DWORD; }
@@ -114,11 +114,11 @@ public class COFFHeader extends FieldSequenceFormat {
         },
         SIZE_OF_OPTIONAL_HEADER {
             public void read(ByteBuffer source, COFFHeader dest) {
-                dest.sizeOfOptionalHeader = getUnsignedShort(source);
+                dest.sizeOfOptionalHeader = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFHeader source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.sizeOfOptionalHeader);
+                putUnsignedShort(dest, source.sizeOfOptionalHeader, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }
@@ -130,11 +130,11 @@ public class COFFHeader extends FieldSequenceFormat {
         },
         CHARACTERISTICS {
             public void read(ByteBuffer source, COFFHeader dest) {
-                dest.characteristics = getUnsignedShort(source);
+                dest.characteristics = getUnsignedShort(source, ByteOrder.LITTLE_ENDIAN);
             }
 
             public void write(COFFHeader source, ByteBuffer dest) {
-                putUnsignedShort(dest, source.characteristics);
+                putUnsignedShort(dest, source.characteristics, ByteOrder.LITTLE_ENDIAN);
             }
 
             public int size() { return WORD; }

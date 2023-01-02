@@ -15,7 +15,7 @@ public class ClassRefConstant<CR> extends Constant<CR> {
         this.nameRef = ref;
     }
 
-    public String resolveName() throws FormatException {
+    public String resolveName() throws ResolveException {
         return nameRef.resolve().value;
     }
 

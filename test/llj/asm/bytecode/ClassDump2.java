@@ -40,7 +40,7 @@ public class ClassDump2 {
 
         cache.cache.put(classData.name, classData);
 
-        classData.linkAll(cache);
+        classData.linkAll(cache, false);
 
         {
             System.out.println("Name of class: " + classData.name);

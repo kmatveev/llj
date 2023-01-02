@@ -25,6 +25,7 @@ public class DoubleConstant<E> extends Constant<E> {
 
     public static DoubleConstant readFrom(ReadableByteChannel bb) throws ReadException {
         try {
+            // reading from ByteBuffer has the same effect as using Double.longBitsToDouble(bits);
             double value =  BinIOTools.getDouble(bb, ByteOrder.BIG_ENDIAN);
             return new DoubleConstant(value);
         } catch (ReadException e) {
@@ -34,6 +35,7 @@ public class DoubleConstant<E> extends Constant<E> {
 
     @Override
     public int writeTo(WritableByteChannel bb) throws IOException {
+        // writing to ByteBuffer has the same effect as using Double.longBitsToDouble(bits);
         BinIOTools.putDouble(bb, value);
         return BinIOTools.SIZE_DOUBLE;
     }

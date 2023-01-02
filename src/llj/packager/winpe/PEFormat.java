@@ -26,6 +26,7 @@ import static llj.util.BinIOTools.*;
 public class PEFormat implements Format {
 
     public static final String[] DIRECTORY_ENTRY_NAMES = new String[]{"Export table", "Import table", "Resource table", "Exception table", "Certificate table", "Base relocation table", "Debug", "Architecture", "Global ptr", "TLS table", "Load config table", "Bound import", "IAT", "Delay import descriptor", "CLR Runtime header", "Reserved"};
+    public static final int EXPORTS_INDEX = 0, IMPORTS_INDEX = 1, RESOURCES_INDEX = 2, RELOCS_INDEX = 5;
     public final ExtendedDOSHeader dosHeader = new ExtendedDOSHeader();
     public final COFFHeader coffHeader = new COFFHeader();
     
@@ -33,8 +34,9 @@ public class PEFormat implements Format {
     public COFFOptionalHeaderPE32 coffOptionalHeaderPE32 = null;
     public COFFOptionalHeaderPE32Plus coffOptionalHeaderPE32Plus = null;
     
-    public ExportDirectoryTableEntry exportDirectoryTable;
+    public ExportBlock exports;
     public List<ImportBlock> imports;
+    public List<BaseRelocationsBlock> baseRelocations;
     public ResourceDirectory resourceRoot;
     
     public final List<Section> sections = new ArrayList<Section>();
@@ -189,39 +191,56 @@ public class PEFormat implements Format {
 
         
         if (coffOptionalHeaderPE32 != null) {
-            if ((coffOptionalHeaderPE32.dataDirectory.size() > 0) && coffOptionalHeaderPE32.dataDirectory.get(0).VirtualAddress > 0) {
-                exportDirectoryTable = new ExportDirectoryTableEntry();
+            if ((coffOptionalHeaderPE32.dataDirectory.size() > EXPORTS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(EXPORTS_INDEX).VirtualAddress > 0) {
+                long exportDirTableRva = coffOptionalHeaderPE32.dataDirectory.get(EXPORTS_INDEX).VirtualAddress;
+                readExportDirectoryTable(exportDirTableRva);
             }
-            if ((coffOptionalHeaderPE32.dataDirectory.size() > 1) && coffOptionalHeaderPE32.dataDirectory.get(1).VirtualAddress > 0) {
+            if ((coffOptionalHeaderPE32.dataDirectory.size() > IMPORTS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(IMPORTS_INDEX).VirtualAddress > 0) {
                 imports = new ArrayList<>();
-                long importDirTableRva = coffOptionalHeaderPE32.dataDirectory.get(1).VirtualAddress;
+                long importDirTableRva = coffOptionalHeaderPE32.dataDirectory.get(IMPORTS_INDEX).VirtualAddress;
                 readImportDirectoryTable(importDirTableRva, false);
             }
-            if ((coffOptionalHeaderPE32.dataDirectory.size() > 2) && coffOptionalHeaderPE32.dataDirectory.get(2).VirtualAddress > 0) {
-                long resourceRootRva = coffOptionalHeaderPE32.dataDirectory.get(2).VirtualAddress;
-                Section section = findByRelativeVirtualAddress(resourceRootRva);
+            if ((coffOptionalHeaderPE32.dataDirectory.size() > RESOURCES_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(RESOURCES_INDEX).VirtualAddress > 0) {
+                long resourceRootRva = coffOptionalHeaderPE32.dataDirectory.get(RESOURCES_INDEX).VirtualAddress;
+                Section section = findSectionByRVA(resourceRootRva);
                 ByteBuffer bb = section.getByVirtualAddress(resourceRootRva);
                 resourceRoot = new ResourceDirectory();
                 List<Section.Usage> usages = resourceRoot.resolve(bb, "/Root");
                 section.usages.addAll(usages);
+            }
+            if ((coffOptionalHeaderPE32.dataDirectory.size() > RELOCS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(5).VirtualAddress > RELOCS_INDEX) {
+                long relocBlocksRva = coffOptionalHeaderPE32.dataDirectory.get(RELOCS_INDEX).VirtualAddress;
+                Section section = findSectionByRVA(relocBlocksRva);
+                ByteBuffer bb = section.getByVirtualAddress(relocBlocksRva);
+                long relocBlocksSize = coffOptionalHeaderPE32.dataDirectory.get(RELOCS_INDEX).Size;
+                readBaseRelocations(bb, relocBlocksSize);
+                
             }
             
         } else if (coffOptionalHeaderPE32Plus != null) {
-            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > 0) && coffOptionalHeaderPE32Plus.dataDirectory.get(0).VirtualAddress > 0) {
-                exportDirectoryTable = new ExportDirectoryTableEntry();
+            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > EXPORTS_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(EXPORTS_INDEX).VirtualAddress > 0) {
+                long exportDirTableRva = coffOptionalHeaderPE32Plus.dataDirectory.get(EXPORTS_INDEX).VirtualAddress;
+                readExportDirectoryTable(exportDirTableRva);
             }
-            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > 1) && coffOptionalHeaderPE32Plus.dataDirectory.get(1).VirtualAddress > 0) {
+            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > IMPORTS_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(IMPORTS_INDEX).VirtualAddress > 0) {
                 imports = new ArrayList<>();
-                long importDirTableRva = coffOptionalHeaderPE32Plus.dataDirectory.get(1).VirtualAddress;
+                long importDirTableRva = coffOptionalHeaderPE32Plus.dataDirectory.get(IMPORTS_INDEX).VirtualAddress;
                 readImportDirectoryTable(importDirTableRva, true);
             }
-            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > 2) && coffOptionalHeaderPE32Plus.dataDirectory.get(2).VirtualAddress > 0) {
-                long resourceRootRva = coffOptionalHeaderPE32Plus.dataDirectory.get(2).VirtualAddress;
-                Section section = findByRelativeVirtualAddress(resourceRootRva);
+            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > RESOURCES_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(RESOURCES_INDEX).VirtualAddress > 0) {
+                long resourceRootRva = coffOptionalHeaderPE32Plus.dataDirectory.get(RESOURCES_INDEX).VirtualAddress;
+                Section section = findSectionByRVA(resourceRootRva);
                 ByteBuffer bb = section.getByVirtualAddress(resourceRootRva);
                 resourceRoot = new ResourceDirectory();
                 List<Section.Usage> usages = resourceRoot.resolve(bb, "/Root");
                 section.usages.addAll(usages);
+            }
+            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > RELOCS_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(RELOCS_INDEX).VirtualAddress > 0) {
+                long relocBlocksRva = coffOptionalHeaderPE32Plus.dataDirectory.get(RELOCS_INDEX).VirtualAddress;
+                Section section = findSectionByRVA(relocBlocksRva);
+                ByteBuffer bb = section.getByVirtualAddress(relocBlocksRva);
+                long relocBlocksSize = coffOptionalHeaderPE32Plus.dataDirectory.get(RELOCS_INDEX).Size;
+                readBaseRelocations(bb, relocBlocksSize);
             }
             
         }
@@ -229,9 +248,72 @@ public class PEFormat implements Format {
         
 
     }
+    
+    public DirectoryEntry getDirectoryEntry(int index) {
+        if (coffOptionalHeaderPE32 != null) {
+            return coffOptionalHeaderPE32.dataDirectory.get(index);
+        } else if (coffOptionalHeaderPE32Plus != null) {
+            return coffOptionalHeaderPE32Plus.dataDirectory.get(index);
+        } else {
+            return null;
+        }
+    }
+
+    public void readExportDirectoryTable(long exportDirTableRva) {
+        Section section = findSectionByRVA(exportDirTableRva);
+        ByteBuffer bb = section.getByVirtualAddress(exportDirTableRva);
+        int count = 0;
+        int size = 0;
+
+        ExportDirectoryTableEntry entry = new ExportDirectoryTableEntry();
+        entry.readFrom(bb);
+        size += entry.getSize();
+        exports = new ExportBlock(entry);
+        Section exportsNameSection = findSectionByRVA(entry.nameRva);
+        exports.name = exportsNameSection.getStringByVirtualAddress(entry.nameRva);
+        addSectionUsage(exportsNameSection, entry.nameRva, exports.name.length() + 1, "ExportDirectoryTableEntry.Name");
+
+        if (entry.numEntries > 0) {
+            Section exportAddressTableSection = findSectionByRVA(entry.exportAddressTableRva);
+            ByteBuffer exportAddressTableRaw = exportAddressTableSection.getByVirtualAddress(entry.exportAddressTableRva);
+            addSectionUsage(exportAddressTableSection, entry.exportAddressTableRva, entry.numEntries * ExportAddressTableEntry.SIZE, "ExportAddressTable");
+            for (int i = 0; i < entry.numEntries; i++) {
+                ExportAddressTableEntry addressTableEntry = new ExportAddressTableEntry(BinIOTools.getUnsignedInt(exportAddressTableRaw));
+                exports.exportedFunctions.add(addressTableEntry);
+            }
+        }
+
+        if (entry.numNamePointers > 0) {
+            Section exportNameTableSection = findSectionByRVA(entry.namePointerRva);
+            ByteBuffer exportNamesTableRaw = exportNameTableSection.getByVirtualAddress(entry.namePointerRva);
+            addSectionUsage(exportNameTableSection, entry.namePointerRva, entry.numNamePointers * 4, "ExportNamesTable");
+
+            Section exportOrdinalTableSection = findSectionByRVA(entry.ordinalTableRva);
+            ByteBuffer exportOrdinalTableRaw = exportOrdinalTableSection.getByVirtualAddress(entry.ordinalTableRva);
+            addSectionUsage(exportOrdinalTableSection, entry.ordinalTableRva, entry.numNamePointers * 2, "ExportOrdinalsTable");
+
+            for (int i = 0; i < entry.numNamePointers; i++) {
+                long nameRva = BinIOTools.getUnsignedInt(exportNamesTableRaw);
+                Section exportedNameSection = findSectionByRVA(nameRva);
+                String exportedName = exportedNameSection.getStringByVirtualAddress(nameRva);
+                exports.exportedFunctionNames.add(exportedName);
+                addSectionUsage(exportedNameSection, nameRva, exportedName.length() + 1, "ExportedName#" + i);
+
+                int addressTableIndexBiased = BinIOTools.getUnsignedShort(exportOrdinalTableRaw);
+                exports.exportedFunctionOrdinalIndexes.add((int) (addressTableIndexBiased - entry.ordinalBase + 1));
+
+            }
+        }
+
+        addSectionUsage(section, exportDirTableRva, size, "ExportDirectoryTable");
+    }
+
+    public static boolean addSectionUsage(Section section, long nameRva, long length, String comment) {
+        return section.usages.add(new Section.Usage(nameRva - section.sectionHeader.virtualAddress, length, comment));
+    }
 
     public void readImportDirectoryTable(long importDirTableRva, boolean is64Bit) {
-        Section section = findByRelativeVirtualAddress(importDirTableRva);
+        Section section = findSectionByRVA(importDirTableRva);
         ByteBuffer bb = section.getByVirtualAddress(importDirTableRva);
         int count = 0;
         int size = 0;
@@ -244,23 +326,27 @@ public class PEFormat implements Format {
             } else {
                 ImportBlock importBlock = new ImportBlock(entry, is64Bit);
                 imports.add(importBlock);
-                importBlock.name = findByRelativeVirtualAddress(entry.nameRva).getStringByVirtualAddress(entry.nameRva);
-                section.usages.add(new Section.Usage(entry.nameRva - section.sectionHeader.virtualAddress, importBlock.name.length() + 1, "ImportDirectoryTableEntry" + String.valueOf(count) + ".Name"));
-                ByteBuffer importLookupEntryRaw = findByRelativeVirtualAddress(entry.importLookupTableRva).getByVirtualAddress(entry.importLookupTableRva);
-                ByteBuffer importAddressEntryRaw = findByRelativeVirtualAddress(entry.importAddressTableRva).getByVirtualAddress(entry.importAddressTableRva);
-                while (true) {
+                Section importBlockSection = findSectionByRVA(entry.nameRva);
+                importBlock.name = importBlockSection.getStringByVirtualAddress(entry.nameRva);
+                addSectionUsage(importBlockSection, entry.nameRva, importBlock.name.length() + 1, "ImportDirectoryTableEntry" + String.valueOf(count) + ".Name");
+                Section importLookupTableSection = findSectionByRVA(entry.importLookupTableRva);
+                ByteBuffer importLookupEntryRaw = importLookupTableSection.getByVirtualAddress(entry.importLookupTableRva);
+                Section importAddressTableSection = findSectionByRVA(entry.importAddressTableRva);
+                ByteBuffer importAddressEntryRaw = importAddressTableSection.getByVirtualAddress(entry.importAddressTableRva);
+                for (int i = 0; true; i++) {
                     if (is64Bit) {
                         ImportLookupEntryPE32Plus lookupEntry = new ImportLookupEntryPE32Plus(BinIOTools.getLong(importLookupEntryRaw));
-                        section.usages.add(new Section.Usage(entry.importLookupTableRva - section.sectionHeader.virtualAddress, ImportLookupEntryPE32Plus.SIZE, "ImportLookupEntryPE32Plus"));
+                        addSectionUsage(importLookupTableSection, entry.importLookupTableRva + i * ImportLookupEntryPE32Plus.SIZE, ImportLookupEntryPE32Plus.SIZE, "ImportLookupEntryPE32Plus#" + i);
                         ImportLookupEntryPE32Plus addressEntry = new ImportLookupEntryPE32Plus(BinIOTools.getLong(importAddressEntryRaw));
-                        section.usages.add(new Section.Usage(entry.importAddressTableRva - section.sectionHeader.virtualAddress, ImportLookupEntryPE32Plus.SIZE, "ImportAddressEntryPE32Plus"));
+                        addSectionUsage(importAddressTableSection, entry.importAddressTableRva + i * ImportLookupEntryPE32Plus.SIZE, ImportLookupEntryPE32Plus.SIZE, "ImportAddressEntryPE32Plus#" + i);
                         if (lookupEntry.isEmpty()) {
                             break;
                         } else {
                             importBlock.importedFunctions64.add(lookupEntry);
                             if (!lookupEntry.isOrdinal()) {
-                                HintNameEntry hintNameEntry = HintNameEntry.readFrom(findByRelativeVirtualAddress(lookupEntry.getHintNameRva()).getByVirtualAddress(lookupEntry.getHintNameRva()));
-                                section.usages.add(new Section.Usage(lookupEntry.getHintNameRva() - section.sectionHeader.virtualAddress, hintNameEntry.getSize(), "HintNameEntry"));
+                                Section hintNameSection = findSectionByRVA(lookupEntry.getHintNameRva());
+                                HintNameEntry hintNameEntry = HintNameEntry.readFrom(hintNameSection.getByVirtualAddress(lookupEntry.getHintNameRva()));
+                                addSectionUsage(hintNameSection, lookupEntry.getHintNameRva(), hintNameEntry.getSize(), "HintNameEntry");
                                 String name = hintNameEntry.value;
                                 importBlock.resolvedImportedFunctions.add(name);
                             } else {
@@ -269,16 +355,17 @@ public class PEFormat implements Format {
                         }
                     } else {
                         ImportLookupEntryPE32 lookupEntry = new ImportLookupEntryPE32(BinIOTools.getInt(importLookupEntryRaw));
-                        section.usages.add(new Section.Usage(entry.importLookupTableRva - section.sectionHeader.virtualAddress, ImportLookupEntryPE32.SIZE, "ImportLookupEntryPE32"));
+                        addSectionUsage(importLookupTableSection, entry.importLookupTableRva + i * ImportLookupEntryPE32.SIZE, ImportLookupEntryPE32.SIZE, "ImportLookupEntryPE32#" + i);
                         ImportLookupEntryPE32 addressEntry = new ImportLookupEntryPE32(BinIOTools.getInt(importAddressEntryRaw));
-                        section.usages.add(new Section.Usage(entry.importAddressTableRva - section.sectionHeader.virtualAddress, ImportLookupEntryPE32.SIZE, "ImportAddressEntryPE32"));
+                        addSectionUsage(importAddressTableSection, entry.importAddressTableRva + i * ImportLookupEntryPE32.SIZE, ImportLookupEntryPE32.SIZE, "ImportAddressEntryPE32#" + i);
                         if (lookupEntry.isEmpty()) {
                             break;
                         } else {
                             importBlock.importedFunctions.add(lookupEntry);
                             if (!lookupEntry.isOrdinal()) {
-                                HintNameEntry hintNameEntry = HintNameEntry.readFrom(findByRelativeVirtualAddress(lookupEntry.getHintNameRva()).getByVirtualAddress(lookupEntry.getHintNameRva()));
-                                section.usages.add(new Section.Usage(lookupEntry.getHintNameRva() - section.sectionHeader.virtualAddress, hintNameEntry.getSize(), "HintNameEntry"));
+                                Section hintNameSection = findSectionByRVA(lookupEntry.getHintNameRva());
+                                HintNameEntry hintNameEntry = HintNameEntry.readFrom(hintNameSection.getByVirtualAddress(lookupEntry.getHintNameRva()));
+                                addSectionUsage(hintNameSection, lookupEntry.getHintNameRva(), hintNameEntry.getSize(), "HintNameEntry");
                                 String name = hintNameEntry.value;
                                 importBlock.resolvedImportedFunctions.add(name);
                             } else {
@@ -291,7 +378,18 @@ public class PEFormat implements Format {
             }
             count += 1;
         }
-        section.usages.add(new Section.Usage(importDirTableRva - section.sectionHeader.virtualAddress, size, "ImportDirectoryTable"));
+        addSectionUsage(section, importDirTableRva, size, "ImportDirectoryTable");
+    }
+
+    public void readBaseRelocations(ByteBuffer bb, long size) {
+        baseRelocations = new ArrayList<>();
+        long remainingSize = size;
+        while (remainingSize > 0) {
+            BaseRelocationsBlock block = new BaseRelocationsBlock();
+            block.readFrom(bb);
+            baseRelocations.add(block);
+            remainingSize -= block.getSize();
+        }
     }
 
     public static boolean readPESignature(ReadableByteChannel channel, ByteBuffer bb) throws IOException {
@@ -309,7 +407,7 @@ public class PEFormat implements Format {
         channel.write(bb);
     }
 
-    public Section findByRelativeVirtualAddress(long rva) {
+    public Section findSectionByRVA(long rva) {
         for (Section section : sections) {
             // in PE file sections contain RVA in field "Virtual address"
             if (section.sectionHeader.containsVirtualAddress(rva)) {
@@ -332,7 +430,7 @@ public class PEFormat implements Format {
     }
 
     // accepts full virtual address
-    public Section findByVirtualAddress(long virtualAddress) {
+    public Section findSectionByVA(long virtualAddress) {
         for (Section section : sections) {
             // in PE file sections contain RVA in field "Virtual address"
             if (section.sectionHeader.containsVirtualAddress(virtualAddress - getImageBaseVA())) {

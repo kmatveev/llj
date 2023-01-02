@@ -21,4 +21,25 @@ public class ImportBlock {
         }
     }
     
+    public int numEntries() {
+        if (importedFunctions != null) {
+            return importedFunctions.size();
+        } else if (importedFunctions64 != null) {
+            return importedFunctions64.size();
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
+    public int sizeInBytes() {
+        if (importedFunctions != null) {
+            return importedFunctions.size() * ImportLookupEntryPE32.SIZE;
+        } else if (importedFunctions64 != null) {
+            return importedFunctions64.size() * ImportLookupEntryPE32Plus.SIZE;
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+    
+    
 }

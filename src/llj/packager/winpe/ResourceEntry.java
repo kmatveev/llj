@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +33,7 @@ public class ResourceEntry {
             dataEntry = new ResourceDataEntry();
             dataEntry.readFrom(src);
             usages.add(new Section.Usage(directoryEntry.valueOffset, dataEntry.SIZE, "ResourceDataEntry" + "/" + ref));
-            // TODO move outside, since we can't resolve RVA here
+            // TODO move outside, since we can't maybeResolve RVA here
             // usages.add(new Section.Usage(dataEntry.dataRva, dataEntry.size, "ResourceData" + "/" + ref));
         } else {
             src.position(directoryEntry.valueOffset);
@@ -48,7 +49,7 @@ public class ResourceEntry {
         byte[] data = new byte[length * 2]; // length is a number of 2-byte characters
         bb.get(data);
         try {
-            CharsetDecoder decoder = Charset.forName("UTF-16LE").newDecoder();
+            CharsetDecoder decoder = StandardCharsets.UTF_16LE.newDecoder();
             String result = decoder.decode(ByteBuffer.wrap(data)).toString();
             return result;
         } catch (CharacterCodingException ex) {

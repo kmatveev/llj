@@ -20,6 +20,7 @@ public class DirectInvokeInstruction extends InvokeInstruction {
     }
 
     public int getObjectOffsetOnOpStack() {
+        // TODO calculate once, then remember the value
         int offset = 0;
         for (Type type : methodRuntimeData.methodData.params) {
             offset += Value.getSizeFor(type.type);

@@ -38,7 +38,6 @@ public abstract class Instruction {
     public abstract Effect getEffect();
 
     public static List<Instruction> readCode(byte[] source, ConstantPool constPool) throws FormatException {
-        source.getClass();
         ArrayList<Instruction> instructions = new ArrayList<Instruction>();
         for (int i = 0; i < source.length;) {
             Instruction instr = getInstruction(source, i, constPool);
@@ -179,12 +178,27 @@ public abstract class Instruction {
             }
             case invokespecial:
             case invokevirtual:
-            case invokestatic:
             {
                 int index = BinTools.getShort(source, i + 1);
                 Constant cnst = constPool.get(index);
                 if (cnst.getType() != Constant.ConstType.METHOD_REF) throw new FormatException("Method description expected");
                 MethodReference methodRef = MethodReference.make((MethodRefConstant<MethodReference, ClassReference>) cnst);
+                // TODO check access flags and static
+                instr = new InvokeInstruction(instrCode, methodRef);
+                break;
+            }
+            case invokestatic:
+            {
+                int index = BinTools.getShort(source, i + 1);
+                Constant cnst = constPool.get(index);
+                MethodReference methodRef;
+                if (cnst.getType() == Constant.ConstType.METHOD_REF) {
+                    methodRef = MethodReference.make((MethodRefConstant<MethodReference, ClassReference>) cnst);
+                } else if (cnst.getType() == Constant.ConstType.INTERFACE_METHOD_REF) {
+                    methodRef = MethodReference.make((InterfaceMethodRefConstant<MethodReference, ClassReference>) cnst);
+                } else {
+                    throw new FormatException("Method description expected");
+                }
                 // TODO check access flags and static
                 instr = new InvokeInstruction(instrCode, methodRef);
                 break;
@@ -314,33 +328,33 @@ public abstract class Instruction {
             case lookupswitch:
             {
                 int k = 1;
-                while (((i + k) & 4) != 0) k++;
+                while (((i + k) & 3) != 0) k++;
                 int defaultVal = BinTools.getSignedInt(source, i + k);
                 int npairs = BinTools.getSignedInt(source, i + k + 4);
                 SortedMap<Integer, InstructionReference> jumpTable = new TreeMap<Integer, InstructionReference>();
                 for (int h = 0; h < npairs; h++) {
-                    int match = BinTools.getSignedInt(source, i + k + 4 + 8 * h);
-                    int offset = BinTools.getSignedInt(source, i + k + 4 + 8 * h + 4);
+                    int match = BinTools.getSignedInt(source, i + k + 8 + 8 * h);
+                    int offset = BinTools.getSignedInt(source, i + k + 8 + 8 * h + 4);
                     jumpTable.put(new Integer(match), new InstructionReference(i + offset));
                 }
                 instr = new TableJumpInstruction(instrCode, new InstructionReference(i + defaultVal), jumpTable);
-                size = k + 8*npairs;
+                size = k + 8 + 8*npairs;
                 break;
             }
             case tableswitch:
             {
                 int k = 1;
-                while (((i + k) & 4) != 0) k++;
+                while (((i + k) & 3) != 0) k++;
                 int defaultVal = BinTools.getSignedInt(source, i + k);
                 int lowVal = BinTools.getSignedInt(source, i + k + 4);
                 int highVal = BinTools.getSignedInt(source, i + k + 8);
                 SortedMap<Integer, InstructionReference> jumpTable = new TreeMap<Integer, InstructionReference>();
                 for (int h = lowVal; h <= highVal; h++) {
-                    int offset = BinTools.getSignedInt(source, i + k + 8 + 4 * h);
+                    int offset = BinTools.getSignedInt(source, i + k + 12 + 4 * (h - lowVal));
                     jumpTable.put(new Integer(h), new InstructionReference(i + offset));
                 }
                 instr = new TableJumpInstruction(instrCode, new InstructionReference(i + defaultVal), jumpTable);
-                size = k + 4*(highVal - lowVal + 1);
+                size = k + 12 + 4*(highVal - lowVal + 1);
                 break;
             }
             case newarray:

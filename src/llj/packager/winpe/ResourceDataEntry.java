@@ -94,7 +94,7 @@ public class ResourceDataEntry extends FieldSequenceFormat {
 
             @Override
             public void write(ResourceDataEntry source, ByteBuffer dest) {
-                putInt(dest, source.reserved);
+                putInt(dest, source.reserved, ByteOrder.LITTLE_ENDIAN);
             }
 
             @Override

@@ -48,10 +48,10 @@ public abstract class Type {
 
     public abstract boolean isAssignableFrom(Type another) throws ClassesNotLoadedException;
 
-    public static Type fromVerificationTypeInfo(StackMapTable.VerificationTypeInfo info) throws ResolveException, FormatException {
+    public static Type fromVerificationTypeInfo(StackMapTable.VerificationTypeInfo info) throws ResolveException {
         switch (info.getKind()) {
             case TOP_VARIABLE_INFO:
-                throw new RuntimeException();
+                return TopType.instance;
             case INTEGER_VARIABLE_INFO:
                 return ScalarType.scalar(TypeType.INT);
             case FLOAT_VARIABLE_INFO:
@@ -61,15 +61,15 @@ public abstract class Type {
             case DOUBLE_VARIABLE_INFO:
                 return ScalarType.scalar(TypeType.DOUBLE);
             case NULL_VARIABLE_INFO:
-                throw new RuntimeException();
+                return RefType.anyRef();
             case UNINITIALIZED_THIS_VARIABLE_INFO:
-                throw new RuntimeException();
+                return RefType.anyRef();
             case OBJECT_VARIABLE_INFO:
                 StackMapTable.ObjectVariableInfo refInfo = (StackMapTable.ObjectVariableInfo)info;
                 ClassReference classRef = ClassReference.make(refInfo.classRef.resolve());
                 return RefType.instanceRef(classRef);
             case UNINITIALIZED_VARIABLE_INFO:
-                throw new RuntimeException();
+                return RefType.anyRef();
             default:
                 throw new RuntimeException();
         }

@@ -172,6 +172,11 @@ public class LoadImmediateInstruction extends Instruction {
     }
 
     @Override
+    public String toString() {
+        return super.toString() + " " + String.valueOf(val);
+    }
+
+    @Override
     public Effect getEffect() {
         return new LDIEffect();
     }
@@ -179,7 +184,13 @@ public class LoadImmediateInstruction extends Instruction {
     class LDIEffect extends Effect {
         @Override
         public void apply(OpStack opStack, LocalVariableTypes localVarTypes) throws IncompatibleStackEffectException {
-            opStack.content.push(ScalarType.scalar(type));
+            if (type.isScalar) {
+                opStack.content.push(ScalarType.scalar(type));
+            } else if ((type == TypeType.REF) || (type == TypeType.ARRAY_REF )) {
+                opStack.content.push(new RefType(null)); // the only constant of reference type is null
+            } else {
+                throw new RuntimeException("Unexpected");
+            }
         }
 
     }

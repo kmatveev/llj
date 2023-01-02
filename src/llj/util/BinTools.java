@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 public class BinTools {
@@ -48,6 +49,32 @@ public class BinTools {
         return ((source[i1] & 0xFF) << 8) + (source[i1 + 1] & 0xFF);
     }
 
+    public static short[] toUnsigned(byte[] source) {
+        return toUnsigned(source, 0);
+    }
+
+    public static short[] toUnsigned(byte[] source, int i1) {
+        return toUnsigned(source, i1, source.length);
+    }
+
+    public static short[] toUnsigned(byte[] source, int i1, int i2) {
+        short[] result = new short[i2 - i1];
+        toUnsigned(source, i1, i2, result, 0);
+        return result;
+    }
+
+    public static void toUnsigned(byte[] source, int i1, int i2, short[] dest, int i3) {
+        for (int i = 0; i < i2 - i1; i++) {
+            dest[i3 + i] = (short) (source[i1 + i] & 0xFF);
+        }
+    }
+
+    public static void fromUnsigned(short[] source, int i1, int i2, byte[] dest, int i3) {
+        for (int i = 0; i < i2 - i1; i++) {
+            dest[i3 + i] = (byte) (source[i1 + i]);
+        }
+    }
+
     public static int getSignedShort(byte[] source, int i1) {
         return (source[i1] << 8) | (source[i1 + 1] & 0xFF);
     }
@@ -62,7 +89,7 @@ public class BinTools {
             int pos2 = bb.position();
             bb.limit(pos2 - 1);
             bb.position(pos);
-            CharsetDecoder decoder = Charset.forName("US-ASCII").newDecoder();
+            CharsetDecoder decoder = StandardCharsets.US_ASCII.newDecoder();
             String result = decoder.decode(bb).toString();
             bb.limit(prevLimit);
             bb.position(pos2);

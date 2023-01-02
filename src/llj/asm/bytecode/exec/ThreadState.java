@@ -42,7 +42,7 @@ public class ThreadState {
             // "this" reference is an implicit parameter
             TypeType paramType = i == 0 ? TypeType.REF : params.get(i - 1).type;
             Value val = currentFrame().popOp(paramType);
-            currentLocalVarIdx -= TypeType.size(paramType);  // some vars (of long and double types) occupy two slots in local var tables
+            currentLocalVarIdx -= paramType.size();  // some vars (of long and double types) occupy two slots in local var tables
             frame.setLocal(currentLocalVarIdx, val);
         }
 
@@ -64,7 +64,7 @@ public class ThreadState {
         for (int i = params.size() - 1; i >= 0; i--) {
             TypeType paramType = params.get(i).type;
             Value val = currentFrame().popOp(paramType);
-            currentLocalVarIdx -= TypeType.size(paramType); // some vars (of long and double types) occupy two slots in local var tables
+            currentLocalVarIdx -= paramType.size(); // some vars (of long and double types) occupy two slots in local var tables
             frame.setLocal(currentLocalVarIdx, val);
         }
 
@@ -114,7 +114,7 @@ public class ThreadState {
 
         public OpaqueDoubleSizeValue getLocalDouble(int index) throws IllegalLocalVarIndex {
             if (index < (locals.length - 1)) {
-                return new OpaqueDoubleSizeValue(locals[index], locals[index]);
+                return new OpaqueDoubleSizeValue(locals[index], locals[index + 1]);
             } else {
                 throw new IllegalLocalVarIndex("Index out of range:" + index);
             }
@@ -128,7 +128,7 @@ public class ThreadState {
                     throw new IllegalLocalVarIndex("Index out of range:" + index);
                 }
             } else if (val.getSize() == Value.SIZE_DOUBLE) {
-                if (index < locals.length + 1) {
+                if (index < locals.length - 1) {
                     locals[index] = val.getFirstWord();
                     locals[index + 1] = val.getSecondWord();
                 } else {

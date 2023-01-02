@@ -1,6 +1,7 @@
 package llj.asm.bytecode;
 
 import java.util.Arrays;
+import java.util.List;
 
 public class LocalVariableTypes {
 
@@ -19,6 +20,9 @@ public class LocalVariableTypes {
     public boolean assign(int index, Type type) throws ClassesNotLoadedException {
         if (types[index] == null) {
             types[index] = type;
+            if (index >= usedVars) {
+                usedVars = index + 1;
+            }
             return true;
         } else {
             return types[index].isAssignableFrom(type);
@@ -46,6 +50,13 @@ public class LocalVariableTypes {
         usedVars = newTypes.length;
     }
 
+    public void set(List<Type> newTypes) {
+        for (int i = 0; i < types.length; i++) {
+            types[i] = i < newTypes.size() ? newTypes.get(i) : null;
+        }
+        usedVars = newTypes.size();
+    }
+
     public int getSize() {
         return types.length;
     }
@@ -66,5 +77,22 @@ public class LocalVariableTypes {
         } else {
             return false;
         }
+    }
+    
+    public String tryMergeWith(LocalVariableTypes another) {
+        if (types.length != another.types.length) {
+            return "Frame sizes differ";
+        }
+        int sharedVars = Math.min(usedVars, another.usedVars);
+        for (int i = 0; i < sharedVars; i++) {
+            if (types[i] == null) {
+                if (another.types[i] != null) {
+                    return "Types differ for local var " + i;
+                }
+            } else if (!types[i].equals(another.types[i])) { // maybe use types[i].isAssignableFrom(another.types[i]) ??
+                return "Types differ for local var " + i;
+            }
+        }
+        return null;
     }
 }

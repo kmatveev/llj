@@ -66,6 +66,43 @@ public abstract class Constant<ST> {
                 return NameTypePairConstant.readFrom(pool, bb);
             }
         },
+        METHOD_HANDLE(15) {
+            @Override
+            public MethodHandleConstant readFrom(ConstantPool pool, ReadableByteChannel bb) throws ReadException {
+                return MethodHandleConstant.readFrom(pool, bb);
+            }
+
+        },
+        METHOD_TYPE(16) {
+            @Override
+            public MethodTypeConstant readFrom(ConstantPool pool, ReadableByteChannel bb) throws ReadException {
+                return MethodTypeConstant.readFrom(pool, bb);
+            }
+        },
+        DYNAMIC(17) {
+            @Override
+            public DynamicConstant readFrom(ConstantPool pool, ReadableByteChannel bb) throws ReadException {
+                return DynamicConstant.readFrom(pool, bb);
+            }
+        },
+        INVOKE_DYNAMIC(18) {
+            @Override
+            public InvokeDynamicConstant readFrom(ConstantPool pool, ReadableByteChannel bb) throws ReadException {
+                return InvokeDynamicConstant.readFrom(pool, bb);
+            }
+        },
+        MODULE(19) {
+            @Override
+            public ModuleInfoConstant readFrom(ConstantPool pool, ReadableByteChannel bb) throws ReadException {
+                return ModuleInfoConstant.readFrom(pool, bb);
+            }
+        },
+        PACKAGE(20) {
+            @Override
+            public PackageInfoConstant readFrom(ConstantPool pool, ReadableByteChannel bb) throws ReadException {
+                return PackageInfoConstant.readFrom(pool, bb);
+            }
+        },
         PLACEHOLDER(-1)     {
             public ConstantPlaceholder readFrom(ConstantPool pool, ReadableByteChannel bb) throws ReadException {
                 throw new UnsupportedOperationException();

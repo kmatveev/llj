@@ -85,10 +85,12 @@ public class ClassData {
         return dependencies;
     }
 
-    public void linkAll(Resolver<ClassData, String> classCache) throws LinkException {
+    public void linkAll(Resolver<ClassData, String> classCache, boolean force) throws LinkException {
         for (MethodData method : methods) {
             if (!(method.isAbstract || method.isNative)) {
-                method.link(classCache);
+                if (!method.isLinked() || force) {
+                    method.link(classCache);
+                }
             }
         }
     }

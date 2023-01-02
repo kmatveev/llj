@@ -298,6 +298,7 @@ public class Interpreter
                 MethodRuntimeData declared = invokeInstr.methodRuntimeData;
                 OpaqueSingleSizeValue pointerVal = (OpaqueSingleSizeValue) threadState.currentFrame().getOp(invokeInstr.getObjectOffsetOnOpStack(), TypeType.REF);
                 Heap.Pointer objRef = Heap.Pointer.load(pointerVal);
+                // TODO handling of NPE should involve extraction of method params from op stack
                 if (heap.isNull(objRef)) throw new NullPointer();
                 MethodRuntimeData actual = declared.findVirtual(ClassRuntimeData.readClassRef(classHeap, heap, objRef));
                 actual.link(vm);

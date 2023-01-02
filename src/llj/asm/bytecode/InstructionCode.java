@@ -192,7 +192,7 @@ public enum InstructionCode {
     caload                  (0x34),
     castore                 (0x55),
     saload                  (0x35),
-    sastore                 (0x36),
+    sastore                 (0x56),
 
 
     bipush                  (0x10, 2),

@@ -45,16 +45,16 @@ public class ExportDirectoryTableEntry extends FieldSequenceFormat {
             }
 
             public void read(ByteBuffer source, ExportDirectoryTableEntry dest) {
-                dest.timestsamp = getUnsignedInt(source);
+                dest.timeDateStamp = getUnsignedInt(source);
             }
 
             public void write(ExportDirectoryTableEntry source, ByteBuffer dest) {
-                putUnsignedInt(dest, source.timestsamp);
+                putUnsignedInt(dest, source.timeDateStamp);
             }
 
             @Override
             public Optional<String> getStringValue(ExportDirectoryTableEntry format, DisplayFormat displayFormat) {
-                return DisplayFormat.getLongString(displayFormat, format.timestsamp, size(), ByteOrder.LITTLE_ENDIAN);
+                return DisplayFormat.getLongString(displayFormat, format.timeDateStamp, size(), ByteOrder.LITTLE_ENDIAN);
             }
             
         },
@@ -242,7 +242,7 @@ public class ExportDirectoryTableEntry extends FieldSequenceFormat {
     }
     
     public long flags;
-    public long timestsamp;
+    public long timeDateStamp;
     public int majorVersion, minorVersion;
     public long nameRva;
     public long ordinalBase;

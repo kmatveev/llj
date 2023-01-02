@@ -5,12 +5,13 @@ import llj.packager.jclass.attributes.StackMapTable;
 import llj.packager.jclass.constants.ResolveException;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
 
 public class MethodStaticInfo {
 
-    private MethodData method;
+    private final MethodData method;
     private final InstructionStaticInfo[] instrInfo;
     private List<ClassData> dependentClasses = new ArrayList<ClassData>();
 
@@ -38,9 +39,12 @@ public class MethodStaticInfo {
         InstructionStaticInfo prevInfo = methodStaticInfo.instrInfo[0];
         prevInfo.stackStateBefore = new OpStack();
         prevInfo.localVarTypesBefore = initialLocalVarTypes;
-
+        
+        // 4.7.4. The StackMapTable Attribute
+        boolean firstFrame = true;
         for (StackMapTable.StackMapFrame frame : stackMapTable.frames) {
-            offset += frame.getOffsetDelta() + (offset == 0 ? 0 : 1);
+            offset += frame.getOffsetDelta() + (firstFrame ? 0 : 1);
+            firstFrame = false;
             InstructionStaticInfo currInfo = methodStaticInfo.instrInfo[methodData.atByteOffset(offset).index];
             if (frame instanceof StackMapTable.SameFrame) {
                 currInfo.localVarTypesBefore = prevInfo.localVarTypesBefore.clone();
@@ -51,12 +55,19 @@ public class MethodStaticInfo {
                 StackMapTable.SameLocals1StackItemFrame stackItemFrame = (StackMapTable.SameLocals1StackItemFrame)frame;
                 Type itemType = Type.fromVerificationTypeInfo(stackItemFrame.stackItemInfo);
                 currInfo.stackStateBefore.content.push(itemType);
+                if (itemType != TopType.instance && itemType.type.size() > 1) {
+                    currInfo.stackStateBefore.content.push(TopType.instance);
+                }
             } else if (frame instanceof StackMapTable.AppendFrame) {
                 currInfo.localVarTypesBefore = prevInfo.localVarTypesBefore.clone();
                 currInfo.stackStateBefore = new OpStack();
                 StackMapTable.AppendFrame appendFrame = (StackMapTable.AppendFrame)frame;
                 for (StackMapTable.VerificationTypeInfo typeInfo : appendFrame.appends) {
-                    currInfo.localVarTypesBefore.add(Type.fromVerificationTypeInfo(typeInfo));
+                    Type localsType = Type.fromVerificationTypeInfo(typeInfo);
+                    currInfo.localVarTypesBefore.add(localsType);
+                    if (localsType != TopType.instance && localsType.type.size() > 1) {
+                        currInfo.localVarTypesBefore.add(TopType.instance);
+                    }
                 }
             } else if (frame instanceof StackMapTable.ChopFrame) {
                 currInfo.localVarTypesBefore = prevInfo.localVarTypesBefore.clone();
@@ -69,15 +80,23 @@ public class MethodStaticInfo {
                 StackMapTable.FullFrame fullFrame = (StackMapTable.FullFrame)frame;
 
                 currInfo.localVarTypesBefore = new LocalVariableTypes(methodData.stackFrameSize);
-                Type[] localsTypes = new Type[fullFrame.locals.length];
+                List<Type> localsTypes = new ArrayList<Type>(fullFrame.locals.length);
                 for (int i = 0; i < fullFrame.locals.length; i++) {
-                    localsTypes[i] = Type.fromVerificationTypeInfo(fullFrame.locals[i]);
+                    Type localsType = Type.fromVerificationTypeInfo(fullFrame.locals[i]);
+                    localsTypes.add(localsType);
+                    if (localsType != TopType.instance && localsType.type.size() > 1) {
+                        localsTypes.add(TopType.instance);
+                    }
                 }
                 currInfo.localVarTypesBefore.set(localsTypes);
 
                 currInfo.stackStateBefore = new OpStack();
                 for (StackMapTable.VerificationTypeInfo typeInfo : fullFrame.stackItems) {
-                    currInfo.stackStateBefore.content.push(Type.fromVerificationTypeInfo(typeInfo));
+                    Type stackItemType = Type.fromVerificationTypeInfo(typeInfo);
+                    currInfo.stackStateBefore.content.push(stackItemType);
+                    if (stackItemType != TopType.instance && stackItemType.type.size() > 1) {
+                        currInfo.stackStateBefore.content.push(TopType.instance);
+                    }
                 }
             }
 
@@ -101,7 +120,11 @@ public class MethodStaticInfo {
             for (int i = 0; i < methodData.params.size(); i++) {
                 Type paramType = methodData.params.get(i);
                 initialLocalVarTypes.assign(localVarIdx, paramType);
-                localVarIdx += TypeType.size(paramType.type); // some vars (of long and double types) occupy two slots in local var tables
+                localVarIdx += 1;
+                if (paramType.type.size() > 1) {  // some vars (of long and double types) occupy two slots in local var tables
+                    initialLocalVarTypes.assign(localVarIdx, TopType.instance);
+                    localVarIdx += 1;
+                }
             }
         } catch (ClassesNotLoadedException e) {
             // Should not be thrown, since initially local var table is empty. Thus, catch original exception and re-throw via RuntimeException
@@ -168,8 +191,9 @@ public class MethodStaticInfo {
             staticInfo.stackStateBefore = stackBefore;
         }
         if (staticInfo.localVarTypesBefore != null) {
-            if (!staticInfo.localVarTypesBefore.equals(localVarTypesBefore)) {
-                staticInfo.error = "LocalVarTypes merge error";
+            String error = staticInfo.localVarTypesBefore.tryMergeWith(localVarTypesBefore);
+            if (error != null) {
+                staticInfo.error = "LocalVarTypes merge error:" + error;
             }
         } else {
             staticInfo.localVarTypesBefore = localVarTypesBefore;
@@ -180,23 +204,32 @@ public class MethodStaticInfo {
         }
     }
 
-    public String getStackStateAfter(int instrIdx) {
+    public List<String> getStackStateAfter(int instrIdx) {
         InstructionStaticInfo staticInfo = instrInfo[instrIdx];
         if (staticInfo.error != null) {
-            return staticInfo.error;
+            return Collections.singletonList(staticInfo.error);
         } else if (staticInfo.stackStateAfter != null) {
-            return staticInfo.stackStateAfter.content.toString();
+            List<String> result = new ArrayList<>(staticInfo.stackStateAfter.content.size());
+            for (Type type : staticInfo.stackStateAfter.content) {
+                result.add(type.toString());
+            }
+            return result;
         } else {
-            return "";
+            return Collections.singletonList("");
         }
     }
 
-    public String getStackStateBefore(int instrIdx) {
+    public List<String> getStackStateBefore(int instrIdx) {
         InstructionStaticInfo staticInfo = instrInfo[instrIdx];
         if (staticInfo.stackStateBefore != null) {
-            return staticInfo.stackStateBefore.content.toString();
+            List<String> result = new ArrayList<>(staticInfo.stackStateBefore.content.size());
+            for (Type type : staticInfo.stackStateBefore.content) {
+                result.add(type.toString());
+            }
+            return result;
+            
         } else {
-            return "";
+            return Collections.singletonList("");
         }
     }
 

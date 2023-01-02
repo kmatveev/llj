@@ -20,6 +20,10 @@ public enum TypeType {
         }
         throw new IllegalArgumentException("Not supported:" + id);
     }
+    
+    public int size() {
+        return size(this);
+    }
 
     public static int size(TypeType type) {
         switch (type) {
@@ -30,6 +34,7 @@ public enum TypeType {
             case SHORT:
             case CHAR:
             case BYTE:
+            case FLOAT:    
             case BOOLEAN:
                 return 1;
             case REF:

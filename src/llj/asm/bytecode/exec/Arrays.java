@@ -20,7 +20,7 @@ public class Arrays {
 
     public static Heap.Pointer allocateScalarArray(ClassRuntimeData arrayClassRuntimeData, TypeType elemType, int numElements, Heap heap) throws OutOfMemory {
         ArrayHeader header = new ArrayHeader(arrayClassRuntimeData.selfRef, numElements);
-        int sizeMultiplier = TypeType.size(elemType);
+        int sizeMultiplier = elemType.size();
         Heap.Pointer pointer = heap.allocate(header.size() + (numElements * 4 * sizeMultiplier));
         // TODO init array with zeroes
         try {
@@ -127,7 +127,7 @@ public class Arrays {
         ClassData arrayClass = classHeap.get(arrayHeader.classIndex).classData;
         if (ClassIntrinsics.arrayElementTypeFor(arrayClass) != elemType) throw new RuntimeException("Array element type mismatch");
         if (index < 0 || index >= arrayHeader.numElements) throw new ArrayIndexOutOfBounds();
-        int sizeMultiplier = TypeType.size(elemType);
+        int sizeMultiplier = elemType.size();
         Heap.Pointer elementPointer = pointer.moveUp(heap, arrayHeader.size() + (index * 4 * sizeMultiplier));
         if (sizeMultiplier == 1) {
             return new OpaqueSingleSizeValue(elementPointer.readWord(heap));
@@ -146,7 +146,7 @@ public class Arrays {
         ClassData arrayClass = classHeap.get(arrayHeader.classIndex).classData;
         if (ClassIntrinsics.arrayElementTypeFor(arrayClass) != elemType) throw new RuntimeException("Array element type mismatch");
         if (index < 0 || index >= arrayHeader.numElements) throw new ArrayIndexOutOfBounds();
-        int sizeMultiplier = TypeType.size(elemType);
+        int sizeMultiplier = elemType.size();
 
         Heap.Pointer elementPointer = pointer.moveUp(heap, arrayHeader.size() + (index * 4 * sizeMultiplier));
         if (sizeMultiplier == 1) {
