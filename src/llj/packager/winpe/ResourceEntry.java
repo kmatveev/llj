@@ -33,7 +33,7 @@ public class ResourceEntry {
             dataEntry = new ResourceDataEntry();
             dataEntry.readFrom(src);
             usages.add(new Section.Usage(directoryEntry.valueOffset, dataEntry.SIZE, "ResourceDataEntry" + "/" + ref));
-            // TODO move outside, since we can't maybeResolve RVA here
+            // TODO move outside, since we can't resolve RVA here
             // usages.add(new Section.Usage(dataEntry.dataRva, dataEntry.size, "ResourceData" + "/" + ref));
         } else {
             src.position(directoryEntry.valueOffset);
@@ -44,6 +44,7 @@ public class ResourceEntry {
     }
 
     // TODO lots of short-living objects here, optimize
+
     public static String readResourceString(ByteBuffer bb) {
         int length = BinIOTools.getUnsignedShort(bb);
         byte[] data = new byte[length * 2]; // length is a number of 2-byte characters
@@ -56,5 +57,25 @@ public class ResourceEntry {
             throw new RuntimeException(ex);
         }
 
+    }
+
+    public String getEntryName(boolean shouldTryResolveType) {
+        String name;
+        if (this.resolvedName != null) {
+            name = this.resolvedName;
+        } else {
+            int entryID = this.directoryEntry.integerID;;
+            if (shouldTryResolveType) {
+                ResourceDirectory.ResourceType resourceType = ResourceDirectory.ResourceType.findById(entryID);
+                if (resourceType != null) {
+                    name = resourceType.name();
+                } else {
+                    name = String.valueOf(this.directoryEntry.integerID);
+                }
+            } else {
+                name = String.valueOf(this.directoryEntry.integerID);
+            }
+        }
+        return name;
     }
 }

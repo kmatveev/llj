@@ -335,6 +335,12 @@ public class VisualPE {
 
             tree.repaint();
 
+            try {
+                fileChannel.close();
+            } catch (Exception e) {
+                // ignore
+            }
+
 
         } catch (IOException e) {
             JOptionPane.showMessageDialog(frame, "Was unable to read selected file", "File read error", JOptionPane.ERROR_MESSAGE);
@@ -485,16 +491,16 @@ public class VisualPE {
                 importsNode.add(importBlockNode);
             }
 
-            IdentityHashMap<DefaultMutableTreeNode, ResourceEntry> resourceDirectoryNodes = new IdentityHashMap<>();
+            IdentityHashMap<DefaultMutableTreeNode, ResourceEntry> resourceNodes = new IdentityHashMap<>();
             
-            ResourceEntry rootWrapperEntry = new ResourceEntry(null);
+            ResourceEntry rootWrapperEntry = new ResourceEntry(new ResourceDirectoryEntry()); // we will put some dummy empty directory so processChildren treats this node correctly
             rootWrapperEntry.resolvedName = "Resources";
             rootWrapperEntry.resolvedSubDirectory = peFormat.resourceRoot;
 
             resourcesRootNode = new DefaultMutableTreeNode(rootWrapperEntry.resolvedName);
-            resourceDirectoryNodes.put(resourcesRootNode, rootWrapperEntry);
+            resourceNodes.put(resourcesRootNode, rootWrapperEntry);
             peNode.add(resourcesRootNode);
-            processChildren(rootWrapperEntry, resourcesRootNode, resourceDirectoryNodes, 1);
+            processChildren(rootWrapperEntry, resourcesRootNode, resourceNodes, 1);
         
         DefaultMutableTreeNode relocationsNode = new DefaultMutableTreeNode("PE relocations");
         peNode.add(relocationsNode);
@@ -1307,6 +1313,36 @@ public class VisualPE {
 
                     contentScrollPane.setViewportView(resourcesPanel);
                     
+                } else if (path != null && resourceNodes.containsKey(path.getLastPathComponent())) {
+                    ResourceEntry entry = resourceNodes.get((DefaultMutableTreeNode)path.getLastPathComponent());
+                    JPanel resourcePanel = new JPanel();
+                    resourcePanel.setLayout(new GridBagLayout());
+                    GridBagByRowAdder resourcesRowAdder = new GridBagByRowAdder(col1, col2, col4);
+                    if (entry.dataEntry != null) {
+                        resourcesRowAdder.addRow(resourcePanel, new JLabel("Name or ID: "), new JLabel(String.valueOf(entry.getEntryName(false))), makeFiller());
+                        resourcesRowAdder.addRow(resourcePanel, new JLabel("Type: "), new JLabel("Entry"), makeFiller());
+                        resourcesRowAdder.addRow(resourcePanel, new JLabel("Data RVA: "), new JLabel(getDecAndHexStr(entry.dataEntry.dataRva)), makeFiller());
+                        Section correspondingSection = peFormat.findSectionByRVA(entry.dataEntry.dataRva);
+                        if (correspondingSection != null) {
+                            long offsetInSection = entry.dataEntry.dataRva - correspondingSection.sectionHeader.virtualAddress;
+                            long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
+                            resourcesRowAdder.addRow(resourcePanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                            resourcesRowAdder.addRow(resourcePanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
+                            resourcesRowAdder.addRow(resourcePanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
+                        }
+                        resourcesRowAdder.addRow(resourcePanel, new JLabel("Size: "), new JLabel(String.valueOf(entry.dataEntry.size)), makeFiller());
+                    } else {
+                        resourcesRowAdder.addRow(resourcePanel, new JLabel("Name or ID: "), new JLabel(String.valueOf(entry.getEntryName(false))), makeFiller());
+                        resourcesRowAdder.addRow(resourcePanel, new JLabel("Type: "), new JLabel("Directory"), makeFiller());
+                        resourcesRowAdder.addRow(resourcePanel, new JLabel("Num of entries: "), new JLabel(String.valueOf(entry.resolvedSubDirectory.entries.size())), makeFiller());
+                    }
+                    resourcesRowAdder.addBottomFillerTo(resourcePanel);
+
+                    resourcePanel.setBackground(UIManager.getColor("List.background"));
+                    resourcePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+                    contentScrollPane.setViewportView(resourcePanel);
+
                 }
                 
             }
@@ -1642,15 +1678,15 @@ public class VisualPE {
 
     }
 
-    public void processChildren(ResourceEntry directory, DefaultMutableTreeNode directoryNode, IdentityHashMap<DefaultMutableTreeNode, ResourceEntry> resourceDirectoryNodes, int level) {
+    public void processChildren(ResourceEntry directory, DefaultMutableTreeNode directoryNode, IdentityHashMap<DefaultMutableTreeNode, ResourceEntry> resourceNodes, int level) {
         if (directory.directoryEntry != null) {
             for (ResourceEntry entry : directory.resolvedSubDirectory.entries) {
-                String name = entry.resolvedName != null ? entry.resolvedName : ((level == 1) && (ResourceDirectory.ResourceType.findById(entry.directoryEntry.integerID) != null) ? (ResourceDirectory.ResourceType.findById(entry.directoryEntry.integerID).name()) : String.valueOf(entry.directoryEntry.integerID));
+                String name = entry.getEntryName(level == 1);
                 DefaultMutableTreeNode entryNode = new DefaultMutableTreeNode(name);
-                resourceDirectoryNodes.put(entryNode, entry);
+                resourceNodes.put(entryNode, entry);
                 directoryNode.add(entryNode);
                 if (entry.resolvedSubDirectory != null) {
-                    processChildren(entry, entryNode, resourceDirectoryNodes, level + 1);
+                    processChildren(entry, entryNode, resourceNodes, level + 1);
                 }
             }
         }
