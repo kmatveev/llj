@@ -4,10 +4,7 @@ import llj.packager.Format;
 import llj.packager.RawFormat;
 import llj.packager.coff.*;
 import llj.packager.dosexe.DOSHeader;
-import llj.packager.objcoff.OBJCOFFFormatException;
 import llj.util.BinIOTools;
-import llj.util.BinTools;
-import llj.util.ReadException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -19,13 +16,12 @@ import java.util.*;
 
 import static llj.util.BinIOTools.*;
 
-public class PEFormat implements Format {
+public class PEFormat extends COFFBasedFormat<PEFormatException> implements Format {
 
     public static final String[] DIRECTORY_ENTRY_NAMES = new String[]{"Export table", "Import table", "Resource table", "Exception table", "Certificate table", "Base relocation table", "Debug", "Architecture", "Global ptr", "TLS table", "Load config table", "Bound import", "IAT", "Delay import descriptor", "CLR Runtime header", "Reserved"};
     public static final int EXPORTS_INDEX = 0, IMPORTS_INDEX = 1, RESOURCES_INDEX = 2, RELOCS_INDEX = 5;
     public final ExtendedDOSHeader dosHeader = new ExtendedDOSHeader();
-    public final COFFHeader coffHeader = new COFFHeader();
-    
+
     public COFFOptionalHeaderStandard<Object> coffOptionalHeaderStandard = null;
     public COFFOptionalHeaderPE32 coffOptionalHeaderPE32 = null;
     public COFFOptionalHeaderPE32Plus coffOptionalHeaderPE32Plus = null;
@@ -34,12 +30,6 @@ public class PEFormat implements Format {
     public List<ImportBlock> imports;
     public List<BaseRelocationsBlock> baseRelocations;
     public ResourceDirectory resourceRoot;
-    
-    public final List<Section> sections = new ArrayList<Section>();
-    public final List<Symbol> symbols = new ArrayList<Symbol>();
-    public long sizeOfStringArea;
-    public final List<COFFStringEntry> coffStrings = new ArrayList<>();
-    public final Map<COFFStringEntry, List<String>> coffStringsUsage = new HashMap<>();
     
     public final RawFormat dosStub = new RawFormat(null);
     public boolean peSignatureInPlace;
@@ -66,10 +56,6 @@ public class PEFormat implements Format {
 
     long getSectionHeadersOffset() {
         return (getCOFFHeaderOffset() + getPEHeadersTotalSize());
-    }
-
-    long getSectionHeadersSize() {
-        return (sections.size() * SectionHeader.SIZE);
     }
 
     public void writeTo(WritableByteChannel out) {
@@ -120,119 +106,14 @@ public class PEFormat implements Format {
             throw new PEFormatException("Unable to read PE file, there are no PE signature in place");
         }
 
-        // read COFF header
-        {
-            Object lastField = coffHeader.readFrom(in, readBuffer);
-
-            if (lastField != null) {
-                throw new PEFormatException("Unable to read PE file, COFF header is shorter than expected size");
-            }
-
+        try {
+            super.readCOFFFormat(in, readBuffer);
+        } catch (COFFFormatException e) {
+            throw new PEFormatException(e);
         }
 
-        if (coffHeader.sizeOfOptionalHeader == 0) {
-            throw new PEFormatException("Unable to read PE file, COFF optional header is absent");
-        }
+        readCOFFOptionalHeader(in, readBuffer);
 
-        // read PE optional COFF header
-        {
-            COFFOptionalHeaderStandard<Object> coffOptionalHeaderStandard = new COFFOptionalHeaderStandard<Object>();
-            
-            // no need to read more bytes, since we will not parse them
-            int peOptionalHeaderReadSize = coffHeader.sizeOfOptionalHeader;
-
-            Object lastField = coffOptionalHeaderStandard.readFrom(in, readBuffer, peOptionalHeaderReadSize);
-            
-            if (COFFOptionalHeaderPE32.canExtend(coffOptionalHeaderStandard)) {
-                coffOptionalHeaderPE32 = COFFOptionalHeaderPE32.extend(coffOptionalHeaderStandard);
-            } else if (COFFOptionalHeaderPE32Plus.canExtend(coffOptionalHeaderStandard)) {
-                coffOptionalHeaderPE32Plus = COFFOptionalHeaderPE32Plus.extend(coffOptionalHeaderStandard);
-            } else {
-                this.coffOptionalHeaderStandard = coffOptionalHeaderStandard; 
-            }
-
-            if (lastField != null) {
-                throw new PEFormatException("Unable to read PE file, PE optional header is shorter than expected size");
-            }
-
-        }
-
-        for (int i = 0; i < coffHeader.numberOfSections; i++) {
-            SectionHeader sectionHeader = new SectionHeader();
-            sectionHeader.readFrom(in, readBuffer);
-            Section section = new Section(sectionHeader);
-            sections.add(section);
-        }
-        
-        // now we've completed sequential reading of total COFF header (including optional header and section headers)
-        // so from this point we can use in.position to move file read pointer
-        
-        for (Section section : sections) {
-            section.readFrom(in);
-        }
-        
-
-        for (Section section : sections) {
-            in.position(section.sectionHeader.pointerToRelocations);
-            for (int i = 0; i < section.sectionHeader.numberOfRelocations; i++) {
-                RelocationEntry relocationEntry = new RelocationEntry();
-                relocationEntry.readFrom(in, readBuffer);
-                section.relocations.add(relocationEntry);
-            }
-        }
-
-        if (coffHeader.pointerToSymbolTable > 0) {
-            in.position(coffHeader.pointerToSymbolTable);
-            int auxCount = 0;
-            for (int i = 0; i < coffHeader.numberOfSymbols; i++) {
-                long symbolOffset = in.position() - coffHeader.pointerToSymbolTable;
-                SymbolTableEntry symbolTableEntry = new SymbolTableEntry();
-                symbolTableEntry.readFrom(in, readBuffer);
-                if (auxCount == 0) {
-                    symbols.add(new Symbol(symbolOffset, symbolTableEntry, false));
-                    auxCount = symbolTableEntry.auxCount;
-                } else {
-                    symbols.get(symbols.size() - 1).auxSymbols.add(new Symbol(symbolOffset, symbolTableEntry, true));
-                    auxCount--;
-                }
-            }
-
-            in.position(getStringsOffset());
-            try {
-                sizeOfStringArea = BinIOTools.getUnsignedInt(in);
-                ByteBuffer stringsContent = ByteBuffer.allocate((int) (sizeOfStringArea - 4)); // sizeOfStringArea includes 4 bytes for size itself
-                BinIOTools.readIntoBuffer(in, stringsContent, stringsContent.capacity());
-                while (stringsContent.hasRemaining()) {
-                    int stringOffset = stringsContent.position() + 4;
-                    String strVal = BinTools.readZeroTerminatedAsciiString(stringsContent);
-                    coffStrings.add(new COFFStringEntry(stringOffset, strVal));
-                }
-            } catch (ReadException e) {
-                throw new PEFormatException("Unable to read number of strings", e);
-            }
-
-            for (Symbol symbol : symbols) {
-
-                NameOrStringTablePointer symbolName = symbol.symbolTableEntry.name;
-                String resolvedName;
-                if (symbolName.type == NameOrStringTablePointer.Type.NAME) {
-                    resolvedName = new String(symbolName.name);
-                } else if (symbolName.type == NameOrStringTablePointer.Type.STRING_TABLE_POINTER) {
-                    COFFStringEntry coffString = findByOffset(symbolName.stringTablePointer, "Symbol at " + symbol.offsetInSymbolsArea);
-                    resolvedName = coffString == null ? "" : coffString.value;
-                } else {
-                    throw new RuntimeException();
-                }
-                symbol.resolvedName = resolvedName;
-
-                if (symbol.symbolTableEntry.sectionNumber > 0 &&  symbol.symbolTableEntry.sectionNumber < 0x8FFF) {
-                    symbol.resolvedSection = sections.get(symbol.symbolTableEntry.sectionNumber - 1);
-                }
-
-            }
-        }
-
-        
         if (coffOptionalHeaderPE32 != null) {
             if ((coffOptionalHeaderPE32.dataDirectory.size() > EXPORTS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(EXPORTS_INDEX).VirtualAddress > 0) {
                 long exportDirTableRva = coffOptionalHeaderPE32.dataDirectory.get(EXPORTS_INDEX).VirtualAddress;
@@ -291,7 +172,38 @@ public class PEFormat implements Format {
         
 
     }
-    
+
+    public void readCOFFOptionalHeader(SeekableByteChannel in, ByteBuffer readBuffer) throws IOException, PEFormatException {
+
+        if (coffHeader.sizeOfOptionalHeader == 0) {
+            throw new PEFormatException("Unable to read PE file, COFF optional header is absent");
+        }
+
+
+        // read PE optional COFF header
+        {
+            COFFOptionalHeaderStandard<Object> coffOptionalHeaderStandard = new COFFOptionalHeaderStandard<Object>();
+
+            // no need to read more bytes, since we will not parse them
+            int peOptionalHeaderReadSize = coffHeader.sizeOfOptionalHeader;
+
+            Object lastField = coffOptionalHeaderStandard.readFrom(in, readBuffer, peOptionalHeaderReadSize);
+
+            if (COFFOptionalHeaderPE32.canExtend(coffOptionalHeaderStandard)) {
+                coffOptionalHeaderPE32 = COFFOptionalHeaderPE32.extend(coffOptionalHeaderStandard);
+            } else if (COFFOptionalHeaderPE32Plus.canExtend(coffOptionalHeaderStandard)) {
+                coffOptionalHeaderPE32Plus = COFFOptionalHeaderPE32Plus.extend(coffOptionalHeaderStandard);
+            } else {
+                this.coffOptionalHeaderStandard = coffOptionalHeaderStandard;
+            }
+
+            if (lastField != null) {
+                throw new PEFormatException("Unable to read PE file, PE optional header is shorter than expected size");
+            }
+
+        }
+    }
+
     public DirectoryEntry getDirectoryEntry(int index) {
         if (coffOptionalHeaderPE32 != null) {
             return coffOptionalHeaderPE32.dataDirectory.get(index);
@@ -314,12 +226,12 @@ public class PEFormat implements Format {
         exports = new ExportBlock(entry);
         Section exportsNameSection = findSectionByRVA(entry.nameRva);
         exports.name = exportsNameSection.getStringByVirtualAddress(entry.nameRva);
-        addSectionUsage(exportsNameSection, entry.nameRva, exports.name.length() + 1, "ExportDirectoryTableEntry.Name");
+        exportsNameSection.addUsage(entry.nameRva, exports.name.length() + 1, "ExportDirectoryTableEntry.Name");
 
         if (entry.numEntries > 0) {
             Section exportAddressTableSection = findSectionByRVA(entry.exportAddressTableRva);
             ByteBuffer exportAddressTableRaw = exportAddressTableSection.getByVirtualAddress(entry.exportAddressTableRva);
-            addSectionUsage(exportAddressTableSection, entry.exportAddressTableRva, entry.numEntries * ExportAddressTableEntry.SIZE, "ExportAddressTable");
+            exportAddressTableSection.addUsage(entry.exportAddressTableRva, entry.numEntries * ExportAddressTableEntry.SIZE, "ExportAddressTable");
             for (int i = 0; i < entry.numEntries; i++) {
                 ExportAddressTableEntry addressTableEntry = new ExportAddressTableEntry(BinIOTools.getUnsignedInt(exportAddressTableRaw));
                 exports.exportedFunctions.add(addressTableEntry);
@@ -329,18 +241,18 @@ public class PEFormat implements Format {
         if (entry.numNamePointers > 0) {
             Section exportNameTableSection = findSectionByRVA(entry.namePointerRva);
             ByteBuffer exportNamesTableRaw = exportNameTableSection.getByVirtualAddress(entry.namePointerRva);
-            addSectionUsage(exportNameTableSection, entry.namePointerRva, entry.numNamePointers * 4, "ExportNamesTable");
+            exportNameTableSection.addUsage(entry.namePointerRva, entry.numNamePointers * 4, "ExportNamesTable");
 
             Section exportOrdinalTableSection = findSectionByRVA(entry.ordinalTableRva);
             ByteBuffer exportOrdinalTableRaw = exportOrdinalTableSection.getByVirtualAddress(entry.ordinalTableRva);
-            addSectionUsage(exportOrdinalTableSection, entry.ordinalTableRva, entry.numNamePointers * 2, "ExportOrdinalsTable");
+            exportOrdinalTableSection.addUsage(entry.ordinalTableRva, entry.numNamePointers * 2, "ExportOrdinalsTable");
 
             for (int i = 0; i < entry.numNamePointers; i++) {
                 long nameRva = BinIOTools.getUnsignedInt(exportNamesTableRaw);
                 Section exportedNameSection = findSectionByRVA(nameRva);
                 String exportedName = exportedNameSection.getStringByVirtualAddress(nameRva);
                 exports.exportedFunctionNames.add(exportedName);
-                addSectionUsage(exportedNameSection, nameRva, exportedName.length() + 1, "ExportedName#" + i);
+                exportedNameSection.addUsage(nameRva, exportedName.length() + 1, "ExportedName#" + i);
 
                 int addressTableIndexBiased = BinIOTools.getUnsignedShort(exportOrdinalTableRaw);
                 exports.exportedFunctionOrdinalIndexes.add((int) (addressTableIndexBiased - entry.ordinalBase + 1));
@@ -348,11 +260,7 @@ public class PEFormat implements Format {
             }
         }
 
-        addSectionUsage(section, exportDirTableRva, size, "ExportDirectoryTable");
-    }
-
-    public static boolean addSectionUsage(Section section, long nameRva, long length, String comment) {
-        return section.usages.add(new Section.Usage(nameRva - section.sectionHeader.virtualAddress, length, comment));
+        section.addUsage(exportDirTableRva, size, "ExportDirectoryTable");
     }
 
     public void readImportDirectoryTable(long importDirTableRva, boolean is64Bit) {
@@ -371,7 +279,7 @@ public class PEFormat implements Format {
                 imports.add(importBlock);
                 Section importBlockSection = findSectionByRVA(entry.nameRva);
                 importBlock.name = importBlockSection.getStringByVirtualAddress(entry.nameRva);
-                addSectionUsage(importBlockSection, entry.nameRva, importBlock.name.length() + 1, "ImportDirectoryTableEntry" + String.valueOf(count) + ".Name");
+                importBlockSection.addUsage(entry.nameRva, importBlock.name.length() + 1, "ImportDirectoryTableEntry" + String.valueOf(count) + ".Name");
                 Section importLookupTableSection = findSectionByRVA(entry.importLookupTableRva);
                 ByteBuffer importLookupEntryRaw = importLookupTableSection.getByVirtualAddress(entry.importLookupTableRva);
                 Section importAddressTableSection = findSectionByRVA(entry.importAddressTableRva);
@@ -379,9 +287,9 @@ public class PEFormat implements Format {
                 for (int i = 0; true; i++) {
                     if (is64Bit) {
                         ImportLookupEntryPE32Plus lookupEntry = new ImportLookupEntryPE32Plus(BinIOTools.getLong(importLookupEntryRaw));
-                        addSectionUsage(importLookupTableSection, entry.importLookupTableRva + i * ImportLookupEntryPE32Plus.SIZE, ImportLookupEntryPE32Plus.SIZE, "ImportLookupEntryPE32Plus#" + i);
+                        importLookupTableSection.addUsage(entry.importLookupTableRva + i * ImportLookupEntryPE32Plus.SIZE, ImportLookupEntryPE32Plus.SIZE, "ImportLookupEntryPE32Plus#" + i);
                         ImportLookupEntryPE32Plus addressEntry = new ImportLookupEntryPE32Plus(BinIOTools.getLong(importAddressEntryRaw));
-                        addSectionUsage(importAddressTableSection, entry.importAddressTableRva + i * ImportLookupEntryPE32Plus.SIZE, ImportLookupEntryPE32Plus.SIZE, "ImportAddressEntryPE32Plus#" + i);
+                        importAddressTableSection.addUsage(entry.importAddressTableRva + i * ImportLookupEntryPE32Plus.SIZE, ImportLookupEntryPE32Plus.SIZE, "ImportAddressEntryPE32Plus#" + i);
                         if (lookupEntry.isEmpty()) {
                             break;
                         } else {
@@ -389,7 +297,7 @@ public class PEFormat implements Format {
                             if (!lookupEntry.isOrdinal()) {
                                 Section hintNameSection = findSectionByRVA(lookupEntry.getHintNameRva());
                                 HintNameEntry hintNameEntry = HintNameEntry.readFrom(hintNameSection.getByVirtualAddress(lookupEntry.getHintNameRva()));
-                                addSectionUsage(hintNameSection, lookupEntry.getHintNameRva(), hintNameEntry.getSize(), "HintNameEntry");
+                                hintNameSection.addUsage(lookupEntry.getHintNameRva(), hintNameEntry.getSize(), "HintNameEntry");
                                 String name = hintNameEntry.value;
                                 importBlock.resolvedImportedFunctions.add(name);
                             } else {
@@ -398,9 +306,9 @@ public class PEFormat implements Format {
                         }
                     } else {
                         ImportLookupEntryPE32 lookupEntry = new ImportLookupEntryPE32(BinIOTools.getInt(importLookupEntryRaw));
-                        addSectionUsage(importLookupTableSection, entry.importLookupTableRva + i * ImportLookupEntryPE32.SIZE, ImportLookupEntryPE32.SIZE, "ImportLookupEntryPE32#" + i);
+                        importLookupTableSection.addUsage(entry.importLookupTableRva + i * ImportLookupEntryPE32.SIZE, ImportLookupEntryPE32.SIZE, "ImportLookupEntryPE32#" + i);
                         ImportLookupEntryPE32 addressEntry = new ImportLookupEntryPE32(BinIOTools.getInt(importAddressEntryRaw));
-                        addSectionUsage(importAddressTableSection, entry.importAddressTableRva + i * ImportLookupEntryPE32.SIZE, ImportLookupEntryPE32.SIZE, "ImportAddressEntryPE32#" + i);
+                        importAddressTableSection.addUsage(entry.importAddressTableRva + i * ImportLookupEntryPE32.SIZE, ImportLookupEntryPE32.SIZE, "ImportAddressEntryPE32#" + i);
                         if (lookupEntry.isEmpty()) {
                             break;
                         } else {
@@ -408,7 +316,7 @@ public class PEFormat implements Format {
                             if (!lookupEntry.isOrdinal()) {
                                 Section hintNameSection = findSectionByRVA(lookupEntry.getHintNameRva());
                                 HintNameEntry hintNameEntry = HintNameEntry.readFrom(hintNameSection.getByVirtualAddress(lookupEntry.getHintNameRva()));
-                                addSectionUsage(hintNameSection, lookupEntry.getHintNameRva(), hintNameEntry.getSize(), "HintNameEntry");
+                                hintNameSection.addUsage(lookupEntry.getHintNameRva(), hintNameEntry.getSize(), "HintNameEntry");
                                 String name = hintNameEntry.value;
                                 importBlock.resolvedImportedFunctions.add(name);
                             } else {
@@ -421,7 +329,7 @@ public class PEFormat implements Format {
             }
             count += 1;
         }
-        addSectionUsage(section, importDirTableRva, size, "ImportDirectoryTable");
+        section.addUsage(importDirTableRva, size, "ImportDirectoryTable");
     }
 
     public void readBaseRelocations(ByteBuffer bb, long size) {
@@ -445,23 +353,6 @@ public class PEFormat implements Format {
         }
     }
 
-    public COFFStringEntry findByOffset(long offset, String usage) throws PEFormatException {
-        if (offset <= 0) return null;
-        for(COFFStringEntry stringEntry : coffStrings) {
-            if (stringEntry.offsetInStringsArea == offset) {
-                COFFStringEntry result = stringEntry;
-                coffStringsUsage.merge(stringEntry, Arrays.asList(usage), (o, n) -> {List<String> r = new ArrayList<String>(o); r.addAll(n); return r;});
-                return result;
-            }
-        }
-        if (offset > sizeOfStringArea) throw new PEFormatException("string offset is too large");
-        // TODO we should also support pointers to non-first symbols of strings. In this case we should produce a temp string and return it
-        throw new PEFormatException("Pointers to substrings are not supported");
-    }
-
-    public long getStringsOffset() {
-        return coffHeader.pointerToSymbolTable + (coffHeader.numberOfSymbols * SymbolTableEntry.SIZE);
-    }
 
     public static void writePESignature(WritableByteChannel channel) throws IOException {
         ByteBuffer bb = ByteBuffer.wrap(new byte[]{0x50, 0x45, 0, 0});

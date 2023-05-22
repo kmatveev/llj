@@ -27,7 +27,11 @@ public class Section implements Format {
     public Section() {
         sectionHeader = new SectionHeader();
     }
-    
+
+    public boolean addUsage(long nameRva, long length, String comment) {
+        return this.usages.add(new Usage(nameRva - this.sectionHeader.virtualAddress, length, comment));
+    }
+
     public String getName() {
         return sectionHeader.getStringValue(SectionHeader.Field.NAME, DisplayFormat.ASCII).get();
     }

@@ -1071,6 +1071,9 @@ public class VisualPE {
 
                 } else if (path != null && path.getLastPathComponent() == coffStringsNode) {
                     showCoffStringsInfo(peFormat.getStringsOffset(), peFormat.sizeOfStringArea, peFormat.coffStrings, displayFormatMap);
+                } else if (path != null && path.getLastPathComponent() == coffSymbolsNode) {
+                    showCoffSymbolsInfo(peFormat.coffHeader.pointerToSymbolTable, peFormat.symbols, displayFormatMap);
+
                 }
 
             }
