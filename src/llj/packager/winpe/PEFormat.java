@@ -2,14 +2,12 @@ package llj.packager.winpe;
 
 import llj.packager.Format;
 import llj.packager.RawFormat;
-import llj.packager.coff.COFFHeader;
-import llj.packager.coff.COFFOptionalHeaderStandard;
-import llj.packager.coff.RelocationEntry;
-import llj.packager.coff.Section;
-import llj.packager.coff.SectionHeader;
-import llj.packager.coff.SymbolTableEntry;
+import llj.packager.coff.*;
 import llj.packager.dosexe.DOSHeader;
+import llj.packager.objcoff.OBJCOFFFormatException;
 import llj.util.BinIOTools;
+import llj.util.BinTools;
+import llj.util.ReadException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -17,9 +15,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.channels.WritableByteChannel;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import static llj.util.BinIOTools.*;
 
@@ -40,7 +36,10 @@ public class PEFormat implements Format {
     public ResourceDirectory resourceRoot;
     
     public final List<Section> sections = new ArrayList<Section>();
-    public final List<SymbolTableEntry> symbolTable = new ArrayList<SymbolTableEntry>();
+    public final List<Symbol> symbols = new ArrayList<Symbol>();
+    public long sizeOfStringArea;
+    public final List<COFFStringEntry> coffStrings = new ArrayList<>();
+    public final Map<COFFStringEntry, List<String>> coffStringsUsage = new HashMap<>();
     
     public final RawFormat dosStub = new RawFormat(null);
     public boolean peSignatureInPlace;
@@ -182,11 +181,55 @@ public class PEFormat implements Format {
             }
         }
 
-        in.position(coffHeader.pointerToSymbolTable);
-        for (int i = 0; i < coffHeader.numberOfSymbols; i++) {
-            SymbolTableEntry symbolTableEntry = new SymbolTableEntry();
-            symbolTableEntry.readFrom(in, readBuffer);
-            symbolTable.add(symbolTableEntry);
+        if (coffHeader.pointerToSymbolTable > 0) {
+            in.position(coffHeader.pointerToSymbolTable);
+            int auxCount = 0;
+            for (int i = 0; i < coffHeader.numberOfSymbols; i++) {
+                long symbolOffset = in.position() - coffHeader.pointerToSymbolTable;
+                SymbolTableEntry symbolTableEntry = new SymbolTableEntry();
+                symbolTableEntry.readFrom(in, readBuffer);
+                if (auxCount == 0) {
+                    symbols.add(new Symbol(symbolOffset, symbolTableEntry, false));
+                    auxCount = symbolTableEntry.auxCount;
+                } else {
+                    symbols.get(symbols.size() - 1).auxSymbols.add(new Symbol(symbolOffset, symbolTableEntry, true));
+                    auxCount--;
+                }
+            }
+
+            in.position(getStringsOffset());
+            try {
+                sizeOfStringArea = BinIOTools.getUnsignedInt(in);
+                ByteBuffer stringsContent = ByteBuffer.allocate((int) (sizeOfStringArea - 4)); // sizeOfStringArea includes 4 bytes for size itself
+                BinIOTools.readIntoBuffer(in, stringsContent, stringsContent.capacity());
+                while (stringsContent.hasRemaining()) {
+                    int stringOffset = stringsContent.position() + 4;
+                    String strVal = BinTools.readZeroTerminatedAsciiString(stringsContent);
+                    coffStrings.add(new COFFStringEntry(stringOffset, strVal));
+                }
+            } catch (ReadException e) {
+                throw new PEFormatException("Unable to read number of strings", e);
+            }
+
+            for (Symbol symbol : symbols) {
+
+                NameOrStringTablePointer symbolName = symbol.symbolTableEntry.name;
+                String resolvedName;
+                if (symbolName.type == NameOrStringTablePointer.Type.NAME) {
+                    resolvedName = new String(symbolName.name);
+                } else if (symbolName.type == NameOrStringTablePointer.Type.STRING_TABLE_POINTER) {
+                    COFFStringEntry coffString = findByOffset(symbolName.stringTablePointer, "Symbol at " + symbol.offsetInSymbolsArea);
+                    resolvedName = coffString == null ? "" : coffString.value;
+                } else {
+                    throw new RuntimeException();
+                }
+                symbol.resolvedName = resolvedName;
+
+                if (symbol.symbolTableEntry.sectionNumber > 0 &&  symbol.symbolTableEntry.sectionNumber < 0x8FFF) {
+                    symbol.resolvedSection = sections.get(symbol.symbolTableEntry.sectionNumber - 1);
+                }
+
+            }
         }
 
         
@@ -400,6 +443,24 @@ public class PEFormat implements Format {
         } else {
             return false;
         }
+    }
+
+    public COFFStringEntry findByOffset(long offset, String usage) throws PEFormatException {
+        if (offset <= 0) return null;
+        for(COFFStringEntry stringEntry : coffStrings) {
+            if (stringEntry.offsetInStringsArea == offset) {
+                COFFStringEntry result = stringEntry;
+                coffStringsUsage.merge(stringEntry, Arrays.asList(usage), (o, n) -> {List<String> r = new ArrayList<String>(o); r.addAll(n); return r;});
+                return result;
+            }
+        }
+        if (offset > sizeOfStringArea) throw new PEFormatException("string offset is too large");
+        // TODO we should also support pointers to non-first symbols of strings. In this case we should produce a temp string and return it
+        throw new PEFormatException("Pointers to substrings are not supported");
+    }
+
+    public long getStringsOffset() {
+        return coffHeader.pointerToSymbolTable + (coffHeader.numberOfSymbols * SymbolTableEntry.SIZE);
     }
 
     public static void writePESignature(WritableByteChannel channel) throws IOException {

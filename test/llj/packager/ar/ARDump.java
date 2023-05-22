@@ -15,8 +15,7 @@ import java.util.Set;
 public class ARDump {
 
     public static void main(String[] args) throws Exception {
-        // dump(new File("C:\\Users\\matvkon\\AppData\\Local\\tools\\MinGW\\lib\\libgmp.a"));
-        dump(new File("C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.14393.0\\um\\x64\\User32.Lib"));
+        dump(new File("C:\\Users\\matvkon\\AppData\\Local\\tools\\MinGW\\lib\\libgmp.a"));
     }
 
     public static void dump(File arFile) throws Exception {

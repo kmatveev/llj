@@ -69,7 +69,7 @@ public class OBJDump {
             System.out.println("  "  + "characteristics are: " + fields);
         }
 
-        System.out.println("Number of symbols:" + objFormat.symbolTable.size());
+        System.out.println("Number of symbols:" + objFormat.symbols.size());
 
 
 
