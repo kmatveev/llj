@@ -54,6 +54,28 @@ public class GridBagByRowAdder {
 
         row++;
     }
+
+    public void addSingleComponentWholeRowLeft(JComponent parent, JComponent component, Insets insets) {
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = columnConfig.size();
+        gbc.gridheight = 1;
+        gbc.fill = GridBagConstraints.WEST;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        gbc.weightx = 1.0;
+        gbc.weighty = 0.0;
+
+        if (insets != null) {
+            gbc.insets = insets;
+        }
+
+        parent.add(component, gbc);
+
+        row++;
+    }
+
     
 
     public void addBottomFillerTo(JComponent parent) {

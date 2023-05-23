@@ -39,11 +39,11 @@ public class NameOrStringTablePointer {
         return SIZE;
     }
     
-    public String resolve() {
+    public String getStringVal() {
         if (type == Type.NAME) {
             return new String(name);
         } else {
-            throw new UnsupportedOperationException();
+            return "StringTableBase+" + stringTablePointer;
         }
     }
 }

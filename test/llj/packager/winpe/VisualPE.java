@@ -12,38 +12,8 @@ import llj.packager.winlib.ImportFormat;
 import llj.packager.winlib.ImportHeader;
 import llj.util.swing.GridBagByRowAdder;
 
-import javax.swing.AbstractAction;
-import javax.swing.BorderFactory;
-import javax.swing.DefaultComboBoxModel;
-import javax.swing.JButton;
-import javax.swing.JCheckBoxMenuItem;
-import javax.swing.JComboBox;
-import javax.swing.JComponent;
-import javax.swing.JDialog;
-import javax.swing.JFileChooser;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import javax.swing.JSeparator;
-import javax.swing.JSplitPane;
-import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.JTree;
-import javax.swing.ListSelectionModel;
-import javax.swing.ScrollPaneConstants;
-import javax.swing.UIManager;
-import javax.swing.event.MenuEvent;
-import javax.swing.event.MenuListener;
-import javax.swing.event.PopupMenuEvent;
-import javax.swing.event.PopupMenuListener;
-import javax.swing.event.TreeSelectionEvent;
-import javax.swing.event.TreeSelectionListener;
+import javax.swing.*;
+import javax.swing.event.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -78,6 +48,7 @@ public class VisualPE {
 
     public final JFrame frame;
     public final JTree tree;
+    private boolean sectionUsagesVisible = false;
     public File file;
     private final DefaultTreeModel treeModel;
     private final JScrollPane contentScrollPane;
@@ -395,7 +366,6 @@ public class VisualPE {
         DefaultMutableTreeNode sectionsNode;
         IdentityHashMap<TreeNode, Section> sectionNodes;
         DefaultMutableTreeNode exportsNode, importsNode, resourcesRootNode, exceptionsNode;
-        DefaultMutableTreeNode coffRelocationsNode;
         DefaultMutableTreeNode coffSymbolsNode;
         DefaultMutableTreeNode coffStringsNode;
 
@@ -479,8 +449,6 @@ public class VisualPE {
         }
 
 
-        coffRelocationsNode = new DefaultMutableTreeNode("COFF relocations");
-            peNode.add(coffRelocationsNode);
 
             coffSymbolsNode = new DefaultMutableTreeNode("COFF symbols");
             peNode.add(coffSymbolsNode);
@@ -752,7 +720,7 @@ public class VisualPE {
                                         directoryEntry.name,
                                         getDecAndHexStr(directoryEntry.VirtualAddress),
                                         String.valueOf(directoryEntry.Size),
-                                        correspondingSection != null ? correspondingSection.getName() : "",
+                                        correspondingSection != null ? correspondingSection.resolvedName : "",
                                         correspondingSection != null ? String.valueOf(offsetInSection) : "",
                                         correspondingSection != null ? getDecAndHexStr(offsetInFile) : ""
 
@@ -804,7 +772,7 @@ public class VisualPE {
                         long offsetInSection = exportDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
                         long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
 
-                        exportsRowAdder.addRow(exportsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        exportsRowAdder.addRow(exportsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
                         exportsRowAdder.addRow(exportsPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
                         exportsRowAdder.addRow(exportsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
                         exportsRowAdder.addRow(exportsPanel, new JLabel("Size: "), new JLabel(String.valueOf(exportDirectoryEntry.Size)), makeFiller());
@@ -824,11 +792,11 @@ public class VisualPE {
                             long namePointerRva = peFormat.exports.exportTableEntry.namePointerRva + i * 4;
                             exportsTableModel.addRow(new String[]{
                                     String.valueOf(namePointerRva),
-                                    peFormat.findSectionByRVA(namePointerRva).getName() + "+" + String.valueOf(namePointerRva - peFormat.findSectionByRVA(namePointerRva).sectionHeader.virtualAddress),
+                                    peFormat.findSectionByRVA(namePointerRva).resolvedName + "+" + String.valueOf(namePointerRva - peFormat.findSectionByRVA(namePointerRva).sectionHeader.virtualAddress),
                                     peFormat.exports.exportedFunctionNames.get(i),
                                     String.valueOf(peFormat.exports.exportedFunctionOrdinalIndexes.get(i)),
                                     String.valueOf(exportRvaOrForwarderRva),
-                                    peFormat.findSectionByRVA(exportRvaOrForwarderRva).getName() + "+" + String.valueOf(exportRvaOrForwarderRva - peFormat.findSectionByRVA(exportRvaOrForwarderRva).sectionHeader.virtualAddress)
+                                    peFormat.findSectionByRVA(exportRvaOrForwarderRva).resolvedName + "+" + String.valueOf(exportRvaOrForwarderRva - peFormat.findSectionByRVA(exportRvaOrForwarderRva).sectionHeader.virtualAddress)
                             });
                         }
 
@@ -861,7 +829,7 @@ public class VisualPE {
                         long offsetInSection = importDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
                         long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
 
-                        importsRowAdder.addRow(importsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        importsRowAdder.addRow(importsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
                         importsRowAdder.addRow(importsPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
                         importsRowAdder.addRow(importsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
                         importsRowAdder.addRow(importsPanel, new JLabel("Size: "), new JLabel(String.valueOf(importDirectoryEntry.Size)), makeFiller());
@@ -875,12 +843,12 @@ public class VisualPE {
                             ImportDirectoryTableEntry importTableEntry = importEntry.importTableEntry;
                             importsTableModel.addRow(new String[]{
                                     String.valueOf(importTableEntry.nameRva),
-                                    peFormat.findSectionByRVA(importTableEntry.nameRva).getName() + "+" + String.valueOf(importTableEntry.nameRva - peFormat.findSectionByRVA(importTableEntry.nameRva).sectionHeader.virtualAddress),
+                                    peFormat.findSectionByRVA(importTableEntry.nameRva).resolvedName + "+" + String.valueOf(importTableEntry.nameRva - peFormat.findSectionByRVA(importTableEntry.nameRva).sectionHeader.virtualAddress),
                                     importEntry.name,
                                     String.valueOf(importTableEntry.importLookupTableRva),
-                                    peFormat.findSectionByRVA(importTableEntry.importLookupTableRva).getName() + "+" + String.valueOf(importTableEntry.importLookupTableRva - peFormat.findSectionByRVA(importTableEntry.importLookupTableRva).sectionHeader.virtualAddress),
+                                    peFormat.findSectionByRVA(importTableEntry.importLookupTableRva).resolvedName + "+" + String.valueOf(importTableEntry.importLookupTableRva - peFormat.findSectionByRVA(importTableEntry.importLookupTableRva).sectionHeader.virtualAddress),
                                     String.valueOf(importTableEntry.importAddressTableRva),
-                                    peFormat.findSectionByRVA(importTableEntry.importAddressTableRva).getName() + "+" + String.valueOf(importTableEntry.importAddressTableRva - peFormat.findSectionByRVA(importTableEntry.importAddressTableRva).sectionHeader.virtualAddress),
+                                    peFormat.findSectionByRVA(importTableEntry.importAddressTableRva).resolvedName + "+" + String.valueOf(importTableEntry.importAddressTableRva - peFormat.findSectionByRVA(importTableEntry.importAddressTableRva).sectionHeader.virtualAddress),
                             });
                         }
 
@@ -911,11 +879,11 @@ public class VisualPE {
                     importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Name: "), new JLabel(importBlock.name), makeFiller());
                     ImportDirectoryTableEntry importTableEntry = importBlock.importTableEntry;
                     Section lookupTableSection = peFormat.findSectionByRVA(importTableEntry.importLookupTableRva);
-                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table section + offset: "), new JLabel(lookupTableSection.getName() + "+" + String.valueOf(importTableEntry.importLookupTableRva - lookupTableSection.sectionHeader.virtualAddress)), makeFiller());
+                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table section + offset: "), new JLabel(lookupTableSection.resolvedName + "+" + String.valueOf(importTableEntry.importLookupTableRva - lookupTableSection.sectionHeader.virtualAddress)), makeFiller());
                     importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table num entries: "), new JLabel(String.valueOf(importBlock.numEntries())), makeFiller());
                     importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table size: "), new JLabel(String.valueOf(importBlock.sizeInBytes())), makeFiller());
                     Section addressTableSection = peFormat.findSectionByRVA(importTableEntry.importAddressTableRva);
-                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import address table section + offset: "), new JLabel(addressTableSection.getName() + "+" + String.valueOf(importTableEntry.importAddressTableRva - addressTableSection.sectionHeader.virtualAddress)), makeFiller());
+                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import address table section + offset: "), new JLabel(addressTableSection.resolvedName + "+" + String.valueOf(importTableEntry.importAddressTableRva - addressTableSection.sectionHeader.virtualAddress)), makeFiller());
 
                     DefaultTableModel importedFunctionsTableModel = new DefaultTableModel();
                     importedFunctionsTableModel.setColumnIdentifiers(new String[]{"Name"});
@@ -957,7 +925,7 @@ public class VisualPE {
                         long offsetInSection = relocsDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
                         long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
 
-                        relocationsRowAdder.addRow(relocationsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        relocationsRowAdder.addRow(relocationsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
                         relocationsRowAdder.addRow(relocationsPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
                         relocationsRowAdder.addRow(relocationsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
                         relocationsRowAdder.addRow(relocationsPanel, new JLabel("Size: "), new JLabel(String.valueOf(relocsDirectoryEntry.Size)), makeFiller());
@@ -986,7 +954,7 @@ public class VisualPE {
                         long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
 
                         relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Page RVA: "), new JLabel(String.valueOf(block.pageRva)), makeFiller());
-                        relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
                         relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
                         relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
                         relocationsBlockRowAdder.addRow(relocationsBlockPanel, new JLabel("Size: "), new JLabel(String.valueOf(block.getSize())), makeFiller());
@@ -1023,7 +991,7 @@ public class VisualPE {
                         long offsetInSection = resourcesDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
                         long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
 
-                        resourcesRowAdder.addRow(resourcesPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                        resourcesRowAdder.addRow(resourcesPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
                         resourcesRowAdder.addRow(resourcesPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
                         resourcesRowAdder.addRow(resourcesPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
                         resourcesRowAdder.addRow(resourcesPanel, new JLabel("Size: "), new JLabel(String.valueOf(resourcesDirectoryEntry.Size)), makeFiller());
@@ -1052,7 +1020,7 @@ public class VisualPE {
                         if (correspondingSection != null) {
                             long offsetInSection = entry.dataEntry.dataRva - correspondingSection.sectionHeader.virtualAddress;
                             long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
-                            resourcesRowAdder.addRow(resourcePanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.getName()), makeFiller());
+                            resourcesRowAdder.addRow(resourcePanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
                             resourcesRowAdder.addRow(resourcePanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
                             resourcesRowAdder.addRow(resourcePanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
                         }
@@ -1086,7 +1054,22 @@ public class VisualPE {
 
         JPanel sectionDataOverviewPanel = new JPanel();
 
-        sectionDataOverviewPanel.setLayout(new BorderLayout());
+        sectionDataOverviewPanel.setLayout(new GridBagLayout());
+
+        GridBagByRowAdder sectionRowAdder = new GridBagByRowAdder(col1, col2, col4);
+
+
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(section.getOffsetInFile())), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Size of raw data in file: "), new JLabel(getDecAndHexStr(section.sectionHeader.sizeOfRawData)), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Num of relocations: "), new JLabel(getDecAndHexStr(section.relocations.size())), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Pointer to relocations: "), new JLabel(getDecAndHexStr(section.sectionHeader.pointerToRelocations)), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Size of relocations data in file: "), new JLabel(getDecAndHexStr(section.sectionHeader.numberOfRelocations * RelocationEntry.SIZE)), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Total size of section data in file: "), new JLabel(getDecAndHexStr(section.getSizeInFile())), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Virtual address: "), new JLabel(getDecAndHexStr(section.sectionHeader.virtualAddress)), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Virtual size: "), new JLabel(getDecAndHexStr(section.sectionHeader.physicalAddressOrVirtualSize)), makeFiller());
+
+        sectionRowAdder.addSingleComponentWholeRow(sectionDataOverviewPanel, new JSeparator(), new Insets(10, 5, 10, 5));
+
 
         DefaultTableModel usagesTableModel = new DefaultTableModel();
         usagesTableModel.setColumnIdentifiers(new String[] {"Offset", "Size", "End", "Description"});
@@ -1112,14 +1095,31 @@ public class VisualPE {
         JScrollPane sectionsTableScrollPane = new JScrollPane(usagesTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
         usagesTable.setFillsViewportHeight(true);
 
-        sectionDataOverviewPanel.add(sectionsTableScrollPane, BorderLayout.CENTER);
+        JToggleButton showUsagesButton = new JToggleButton("Show", sectionUsagesVisible);
+        showUsagesButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                sectionUsagesVisible = !sectionUsagesVisible;
+                sectionsTableScrollPane.setVisible(sectionUsagesVisible);
+                sectionDataOverviewPanel.validate();
+            }
+        });
 
+        Box usagesControlContainer = Box.createHorizontalBox();
+        usagesControlContainer.add(new JLabel("Usages: " + section.usages.size()));
+        usagesControlContainer.add(Box.createHorizontalGlue());
+        usagesControlContainer.add(showUsagesButton);
+        sectionRowAdder.addSingleComponentWholeRow(sectionDataOverviewPanel, usagesControlContainer, new Insets(10, 5, 10, 5));
 
+        sectionRowAdder.addSingleComponentWholeRow(sectionDataOverviewPanel, sectionsTableScrollPane, new Insets(10, 5, 10, 5));
+
+        sectionRowAdder.addBottomFillerTo(sectionDataOverviewPanel);
         sectionDataOverviewPanel.setBackground(UIManager.getColor("List.background"));
         sectionDataOverviewPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
 
         contentScrollPane.setViewportView(sectionDataOverviewPanel);
+        sectionsTableScrollPane.setVisible(sectionUsagesVisible);
     }
 
     private void showSectionHeaderInfo(Section section, Map<Object, DisplayFormat> displayFormatMap, int sectionIndex, long sectionHeadersOffset) {
@@ -1354,7 +1354,7 @@ public class VisualPE {
         tableModel.setNumRows(0);
         for (Section section : sections) {
             tableModel.addRow(new String[] {
-                    section.getName(),
+                    section.resolvedName,
                     getDecAndHexStr(section.getOffsetInFile(), displayFormatMap.getOrDefault(prefix + columnName(tableModel, 1), DisplayFormat.DEFAULT)),
                     getDecAndHexStr(section.getSizeInFile(), displayFormatMap.getOrDefault(prefix + columnName(tableModel, 2), DisplayFormat.DEFAULT)),
                     getDecAndHexStr(section.getOffsetInFile() + section.getSizeInFile(), displayFormatMap.getOrDefault(prefix + columnName(tableModel, 3), DisplayFormat.DEFAULT)),
@@ -1641,7 +1641,7 @@ public class VisualPE {
                     symbol.resolvedName,
                     symbol.symbolTableEntry.getComplexType().name() + "(" + symbol.symbolTableEntry.getBaseType().name() + ")",
                     SymbolTableEntry.StorageClass.valueOf(symbol.symbolTableEntry.storageClass).name(),
-                    symbol.resolvedSection == null ? "" : String.valueOf(symbol.resolvedSection.getName()) + "(#" + (symbol.symbolTableEntry.sectionNumber) + ")",
+                    symbol.resolvedSection == null ? "" : String.valueOf(symbol.resolvedSection.resolvedName) + "(#" + (symbol.symbolTableEntry.sectionNumber) + ")",
                     String.valueOf(symbol.symbolTableEntry.value),
                     String.valueOf(symbol.auxSymbols.size())
             });
@@ -1713,9 +1713,6 @@ public class VisualPE {
             sectionNodes.put(sectionNode, section);
             sectionsNode.add(sectionNode);
         }
-
-        DefaultMutableTreeNode coffRelocationsNode = new DefaultMutableTreeNode("COFF relocations");
-        coffNode.add(coffRelocationsNode);
 
         DefaultMutableTreeNode coffSymbolsNode = new DefaultMutableTreeNode("COFF symbols");
         coffNode.add(coffSymbolsNode);

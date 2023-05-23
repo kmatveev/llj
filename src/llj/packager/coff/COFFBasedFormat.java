@@ -102,7 +102,20 @@ public abstract class COFFBasedFormat<E extends  Exception > {
                 }
 
             }
+
         }
+
+        for (Section section : sections) {
+            if (section.sectionHeader.name.type == NameOrStringTablePointer.Type.STRING_TABLE_POINTER) {
+                COFFStringEntry coffStringEntry = coffStrings.size() == 0 ? null : findByOffset(section.sectionHeader.name.stringTablePointer, "Name of Section " + section.getOffsetInFile());
+                section.resolvedName = coffStringEntry ==  null ? section.sectionHeader.name.getStringVal() : coffStringEntry.value;
+            } else if (section.sectionHeader.name.type == NameOrStringTablePointer.Type.NAME) {
+                section.resolvedName = section.sectionHeader.name.getStringVal();
+            } else {
+                throw new RuntimeException();
+            }
+        }
+
     }
 
     public long getStringsOffset() {

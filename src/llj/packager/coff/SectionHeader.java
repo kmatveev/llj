@@ -2,8 +2,6 @@ package llj.packager.coff;
 
 import llj.packager.DisplayFormat;
 import llj.packager.FieldSequenceFormat;
-import llj.packager.IntrospectableFormat;
-import llj.packager.dosexe.DOSHeader;
 import llj.packager.winpe.PEFormat;
 
 import java.io.IOException;
@@ -45,7 +43,7 @@ public class SectionHeader extends FieldSequenceFormat {
 
             @Override
             public Optional<String> getStringValue(SectionHeader format, DisplayFormat displayFormat) {
-                return Optional.of(format.name.resolve());
+                return Optional.of(format.name.getStringVal());
             }
         },
         PHYSICAL_ADDRESS_OR_VIRTUAL_SIZE {

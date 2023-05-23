@@ -18,6 +18,7 @@ public class Section implements Format {
     public final SectionHeader sectionHeader;
     public final List<RelocationEntry> relocations = new ArrayList<>();
     public byte[] data;
+    public String resolvedName;
     public List<Usage> usages = new ArrayList();
 
     public Section(SectionHeader sectionHeader) {
@@ -32,16 +33,19 @@ public class Section implements Format {
         return this.usages.add(new Usage(nameRva - this.sectionHeader.virtualAddress, length, comment));
     }
 
+    // This produces unresolved string name: if name is part of section header, it will be returned, otherwise "StringPointerBase+offset"
+    // If possible, use resolvedName instead
     public String getName() {
         return sectionHeader.getStringValue(SectionHeader.Field.NAME, DisplayFormat.ASCII).get();
     }
-    
+
     public long getOffsetInFile() {
         return sectionHeader.pointerToRawData;
     }
 
     public long getSizeInFile() {
-        return sectionHeader.sizeOfRawData;
+        // here we assume that relocations start exactly after the end of raw data, which is not necessary true
+        return sectionHeader.sizeOfRawData + sectionHeader.numberOfRelocations * RelocationEntry.SIZE;
     }
 
     @Override
@@ -56,7 +60,7 @@ public class Section implements Format {
 
     @Override
     public String getStringValue() {
-        return getName();
+        return resolvedName == null ? getName() : resolvedName;
     }
 
     public void readFrom(SeekableByteChannel in) throws IOException {
