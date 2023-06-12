@@ -1,5 +1,7 @@
 package llj.asm.bytecode;
 
+import llj.util.ref.Resolver;
+
 public class RefType extends Type {
 
     public final ClassReference classRef;
@@ -37,7 +39,14 @@ public class RefType extends Type {
                     }
                 }
             } else if (another.type == TypeType.ARRAY_REF) {
-                return classRef.equals(ClassIntrinsics.OBJECT_CLASS_REF);
+                // we don't need to check array component types here, all these things are checked in ArrayRefType
+                // here we need to check only two cases: assignment to anyRef, and assignment to Object
+                if (classRef == null) {
+                    // this means "any object reference"
+                    return true;
+                } else {
+                    return classRef.equals(ClassIntrinsics.OBJECT_CLASS_REF);
+                }
             } else {
                 throw new RuntimeException();
             }
@@ -66,5 +75,9 @@ public class RefType extends Type {
         } else {
             return false;
         }
+    }
+
+    public void resolveRef(Resolver<ClassData, String> classCache) {
+        classCache.resolveAndCache(classRef);
     }
 }

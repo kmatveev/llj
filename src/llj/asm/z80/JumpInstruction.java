@@ -45,6 +45,8 @@ public class JumpInstruction extends ControlTransferInstruction {
             this.offset = val;
         } else if (type == Type.ABS_IMM) {
             this.absAddr = val;
+        } else if (type == Type.ABS_REGISTER) {
+            this.reg16 = reg16;
         }
         this.condition = condition;
     }

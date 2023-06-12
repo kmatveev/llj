@@ -2,10 +2,10 @@ package llj.asm.z80;
 
 public class InterruptInstruction extends Instruction {
 
-    private static enum Type {HALT, EI, DI, IM}
+    public static enum Type {HALT, EI, DI, IM}
 
-    private final Type type;
-    private int im;
+    public final Type type;
+    public int im;
 
     public static final InterruptInstruction HALT = new InterruptInstruction(Type.HALT, 0);
     public static final InterruptInstruction EI = new InterruptInstruction(Type.EI, 0);

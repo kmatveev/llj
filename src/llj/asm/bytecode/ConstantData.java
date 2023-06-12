@@ -1,13 +1,7 @@
 package llj.asm.bytecode;
 
 import llj.packager.jclass.FormatException;
-import llj.packager.jclass.constants.ClassRefConstant;
-import llj.packager.jclass.constants.Constant;
-import llj.packager.jclass.constants.DoubleConstant;
-import llj.packager.jclass.constants.FloatConstant;
-import llj.packager.jclass.constants.IntegerConstant;
-import llj.packager.jclass.constants.LongConstant;
-import llj.packager.jclass.constants.StringRefConstant;
+import llj.packager.jclass.constants.*;
 
 public class ConstantData {
 
@@ -97,6 +91,32 @@ public class ConstantData {
                 } else {
                     Object value = ((StringRefConstant)source).resolveValue();
                     Type type = RefType.instanceRef(ClassIntrinsics.STRING_CLASS_REF);
+                    ConstantData result = new ConstantData(type, value);
+                    source.setShortcut(result);
+                    return result;
+                }
+            }
+            case METHOD_TYPE:
+            {
+                ConstantData shortcut = (ConstantData)source.getShortcut();
+                if (shortcut != null) {
+                    return shortcut;
+                } else {
+                    Object value = MethodTypeData.read(((MethodTypeConstant)source).typeRef);
+                    Type type = RefType.instanceRef(ClassIntrinsics.METHOD_TYPE_CLASS_REF);
+                    ConstantData result = new ConstantData(type, value);
+                    source.setShortcut(result);
+                    return result;
+                }
+            }
+            case METHOD_HANDLE:
+            {
+                ConstantData shortcut = (ConstantData)source.getShortcut();
+                if (shortcut != null) {
+                    return shortcut;
+                } else {
+                    Object value = MethodHandle.read((MethodHandleConstant)source);
+                    Type type = RefType.instanceRef(ClassIntrinsics.METHOD_HANDLE_CLASS_REF);
                     ConstantData result = new ConstantData(type, value);
                     source.setShortcut(result);
                     return result;

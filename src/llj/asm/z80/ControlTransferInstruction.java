@@ -7,8 +7,8 @@ public abstract class ControlTransferInstruction extends Instruction {
     }
 
     public static class Condition {
-        ConditionFlag flag;
-        boolean set;
+        public ConditionFlag flag;
+        public boolean set;
 
         public static final Condition C = new Condition(ConditionFlag.C, true);
         public static final Condition NC = new Condition(ConditionFlag.C, false);

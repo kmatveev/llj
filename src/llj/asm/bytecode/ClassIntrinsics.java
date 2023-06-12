@@ -10,6 +10,10 @@ public class ClassIntrinsics {
     public static final ClassReference CLASS_CLASS_REF = ClassReference.makeClassRef(CLASS_CLASS_NAME);
     public static final String THROWABLE_CLASS_NAME = "java/lang/Throwable";
     public static final ClassReference TROWABLE_CLASS_REF = ClassReference.makeClassRef(THROWABLE_CLASS_NAME);
+    public static final String CLASS_METHOD_TYPE_NAME = "java/lang/invoke/MethodType";
+    public static final ClassReference METHOD_TYPE_CLASS_REF = ClassReference.makeClassRef(CLASS_METHOD_TYPE_NAME);
+    public static final String CLASS_METHOD_HANDLE_NAME = "java/lang/invoke/MethodHandle";
+    public static final ClassReference METHOD_HANDLE_CLASS_REF = ClassReference.makeClassRef(CLASS_METHOD_TYPE_NAME);
 
     public final static ClassData boolClassData    = new ClassData("boolean", OBJECT_CLASS_REF);
     public final static ClassData byteClassData    = new ClassData("byte", OBJECT_CLASS_REF);

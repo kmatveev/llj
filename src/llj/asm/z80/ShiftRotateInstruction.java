@@ -3,18 +3,24 @@ package llj.asm.z80;
 public class ShiftRotateInstruction extends Instruction {
 
     public static enum Type {
-        RLC(true, true), RLCA(true, true), RL(true, true), RLA(true, true),
-        RRC(true, false), RRCA(true, false), RR(true, false), RRA(true, false),
-        SLA(false, true), SRA(false, true),
-        SLL(false, false), SRL(false, false);
+        RLC(true, true, false, false, false), RLCA(true, true, false, false, true), RL(true, true, true, false, false), RLA(true, true, true, false, true),
+        RRC(true, false, false, false, false), RRCA(true, false, false, false, true), RR(true, false, true, false, false), RRA(true, false, true, false, true),
+        SLA(false, true, true, true, false), SRA(false, false, true, true, false),
+        SLL(false, true, true, false, false), SRL(false, false, true, false, false);
 
-        Type(boolean rotate, boolean left) {
+        Type(boolean rotate, boolean left, boolean throughCarry, boolean arithmetical, boolean shortForm) {
             this.rotate = rotate;
             this.left = left;
+            this.throughCarry = throughCarry;
+            this.arithmetical = arithmetical;
+            this.shortForm = shortForm;
         }
 
         public final boolean rotate;
         public final boolean left;
+        public final boolean throughCarry;
+        public final boolean arithmetical;
+        public final boolean shortForm;
 
     }
 
@@ -151,7 +157,7 @@ public class ShiftRotateInstruction extends Instruction {
         } else {
 
             int indexPrefix = -1;
-            if ((prefix1 == 0xDD) || (prefix1 == 0xFD)) {
+            if ((prefix1 == IX_PREFIX) || (prefix1 == IY_PREFIX)) {
                 if (prefix2 != 0xCB) {
                     return null;
                 }
@@ -180,37 +186,38 @@ public class ShiftRotateInstruction extends Instruction {
             } else if ((code >= 0x38) && (code <= 0x3F)) {
                 type = Type.SRL;
             } else {
-                throw new RuntimeException();
+                return null;
             }
 
-            int cr = code & 0x07;
             Operand op;
-            if (cr == 0x00) {
-                op = Operand.reg8(Operand.Reg8.REG_B);
-            } else if (cr == 0x01) {
-                op = Operand.reg8(Operand.Reg8.REG_C);
-            } else if (cr == 0x02) {
-                op = Operand.reg8(Operand.Reg8.REG_D);
-            } else if (cr == 0x03) {
-                op = Operand.reg8(Operand.Reg8.REG_E);
-            } else if (cr == 0x04) {
-                op = Operand.reg8(Operand.Reg8.REG_H);
-            } else if (cr == 0x05) {
-                op = Operand.reg8(Operand.Reg8.REG_L);
-            } else if (cr == 0x06) {
-                if (indexPrefix == IX_PREFIX) {
-                    op = Operand.memRegPtrIndex(Operand.Reg16.REG_IX, 0);
-                    partial = true;
-                } else if (indexPrefix == IY_PREFIX) {
-                    partial = true;
-                    op = Operand.memRegPtrIndex(Operand.Reg16.REG_IY, 0);
-                } else {
-                    op = Operand.memRegPtr(Operand.Reg16.REG_HL);
-                }
-            } else if (cr == 0x07) {
-                op = Operand.reg8(Operand.Reg8.REG_A);
+            // although this behaviour is undocumented, if ix/iy prefix is present then op is memptr_reg, regardless of c1
+            if (indexPrefix == IX_PREFIX) {
+                op = Operand.memRegPtrIndex(Operand.Reg16.REG_IX, 0);
+                partial = true;
+            } else if (indexPrefix == IY_PREFIX) {
+                partial = true;
+                op = Operand.memRegPtrIndex(Operand.Reg16.REG_IY, 0);
             } else {
-                throw new RuntimeException();
+                int cr = code & 0x07;
+                if (cr == 0x00) {
+                    op = Operand.reg8(Operand.Reg8.REG_B);
+                } else if (cr == 0x01) {
+                    op = Operand.reg8(Operand.Reg8.REG_C);
+                } else if (cr == 0x02) {
+                    op = Operand.reg8(Operand.Reg8.REG_D);
+                } else if (cr == 0x03) {
+                    op = Operand.reg8(Operand.Reg8.REG_E);
+                } else if (cr == 0x04) {
+                    op = Operand.reg8(Operand.Reg8.REG_H);
+                } else if (cr == 0x05) {
+                    op = Operand.reg8(Operand.Reg8.REG_L);
+                } else if (cr == 0x06) {
+                    op = Operand.memRegPtr(Operand.Reg16.REG_HL);
+                } else if (cr == 0x07) {
+                    op = Operand.reg8(Operand.Reg8.REG_A);
+                } else {
+                    throw new RuntimeException();
+                }
             }
             return new ShiftRotateInstruction(code, prefix1, prefix2, type, op, partial);
         }

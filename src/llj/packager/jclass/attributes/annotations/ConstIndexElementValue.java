@@ -25,7 +25,7 @@ public class ConstIndexElementValue extends ElementValue {
     }
 
     public static ConstIndexElementValue readFrom(ConstantPool pool, char tag, ReadableByteChannel in, int length) throws ReadException {
-        if (length != ConstantRef.getSize()) throw new ReadException("Reading ElementValue beyond specified limit");
+        if (length < ConstantRef.getSize()) throw new ReadException("Reading ElementValue beyond specified limit");
         try {
             ConstantRef ref = ConstantRef.readFrom(pool, in);
             return new ConstIndexElementValue(tag, ref);

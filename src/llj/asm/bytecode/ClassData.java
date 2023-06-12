@@ -1,16 +1,15 @@
 package llj.asm.bytecode;
 
 import llj.packager.jclass.ClassFileFormat;
+import llj.packager.jclass.attributes.Attribute;
+import llj.packager.jclass.attributes.BootstrapMethodsAttribute;
 import llj.packager.jclass.constants.ConstantPool;
 import llj.packager.jclass.FieldInfo;
 import llj.packager.jclass.FormatException;
 import llj.packager.jclass.MethodInfo;
 import llj.util.ref.Resolver;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class ClassData {
 
@@ -19,6 +18,7 @@ public class ClassData {
     public final ArrayList<ClassReference> implementedInterfaces = new ArrayList<ClassReference>();
     public final ArrayList<FieldData> fields = new ArrayList<FieldData>();
     public final ArrayList<MethodData> methods = new ArrayList<MethodData>();
+    public final ArrayList<BootstrapMethodData> bootstrapMethods = new ArrayList<BootstrapMethodData>();
     public final ConstantPool constantPool;
 
     public List<Type> parse(String encoded) {
@@ -47,6 +47,15 @@ public class ClassData {
         for (FieldInfo fieldDesc : format.fields) {
             FieldData fieldData = FieldData.read(this, fieldDesc);
             fields.add(fieldData);
+        }
+
+        // we need to handle some attributes, like BootstrapMethods, before handling methods, since method instructions like invokedynamic, will reference BootstrapMethods
+        for(Attribute attr : format.getAttributes()) {
+            if (attr.getType() == Attribute.AttributeType.BOOTSTRAP_METHODS) {
+                for (BootstrapMethodsAttribute.BootstrapMethod bootstrapMethodDesc : ((BootstrapMethodsAttribute)attr).bootstrapMethods) {
+                    bootstrapMethods.add(BootstrapMethodData.read(bootstrapMethodDesc));
+                }
+            }
         }
 
         for (MethodInfo methodDesc : format.methods) {
@@ -86,6 +95,11 @@ public class ClassData {
     }
 
     public void linkAll(Resolver<ClassData, String> classCache, boolean force) throws LinkException {
+
+        if (this.parent != null) {
+            classCache.resolveAndCache(this.parent);
+        }
+
         for (MethodData method : methods) {
             if (!(method.isAbstract || method.isNative)) {
                 if (!method.isLinked() || force) {
@@ -125,6 +139,12 @@ public class ClassData {
         // check that there are no method params and fields with type 'void'
 
         return result;
+    }
+
+    public String[] getPackageComponents() {
+        if (name.indexOf('/') < 0) return new String[0];
+        String[] nameComponents = name.split("/");
+        return Arrays.copyOfRange(nameComponents, 0, nameComponents.length - 1);
     }
 
 }

@@ -48,7 +48,7 @@ public abstract class Annotation extends Attribute {
         }
         length -= SIZE_SHORT;
 
-        ArrayList<llj.packager.jclass.attributes.annotations.Annotation> annotations = new ArrayList<llj.packager.jclass.attributes.annotations.Annotation>();
+        ArrayList<llj.packager.jclass.attributes.annotations.Annotation> annotations = new ArrayList<llj.packager.jclass.attributes.annotations.Annotation>(numOf);
         for (int j = 0; j < numOf; j++) {
             try {
                 llj.packager.jclass.attributes.annotations.Annotation annotation = llj.packager.jclass.attributes.annotations.Annotation.readFrom(pool, in, length);

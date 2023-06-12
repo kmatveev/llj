@@ -17,8 +17,8 @@ import java.util.Set;
 
 public class MethodData extends ClassMemberData {
 
-    public String name;
-    public boolean isStatic, isAbstract, isNative;
+    public boolean isAbstract;
+    public boolean isNative;
     public List<Type> params;
     public Type returnType;
     public List<Instruction> code;
@@ -26,12 +26,10 @@ public class MethodData extends ClassMemberData {
     public MethodStaticInfo loadedStaticInfo;
 
     public MethodData(ClassData classData, String name, boolean isStatic, boolean isAbstract, boolean isNative, List<Type> params, Type returnType, List<Instruction> code, int stackFrameSize, int opStackSize) {
-        super(classData);
-        this.name = name;
+        super(classData, name, isStatic);
         this.params = params;
         this.returnType = returnType;
         this.code = code;
-        this.isStatic = isStatic;
         this.isAbstract = isAbstract;
         this.isNative = isNative;
         this.stackFrameSize = stackFrameSize;
@@ -99,7 +97,7 @@ public class MethodData extends ClassMemberData {
                     throw new FormatException("Abstract method contains code attribute");
                 }
                 Code codeDesc = (Code)attr;
-                code = Instruction.readCode(codeDesc.code, classData.constantPool);
+                code = Instruction.readCode(codeDesc.code, classData.constantPool, classData.bootstrapMethods);
                 stackFrameSize = codeDesc.maxLocals + 1;
                 opStackSize = codeDesc.maxStack + 1;
                 for (Attribute codeAttr : codeDesc.attributes) {
@@ -179,6 +177,16 @@ public class MethodData extends ClassMemberData {
     }
 
     public void link(Resolver<ClassData, String> classCache) throws LinkException {
+
+        for (Type paramType : params) {
+            if (paramType.type == TypeType.REF) {
+                ((RefType)paramType).resolveRef(classCache);
+            }
+        }
+        if (returnType.type == TypeType.REF) {
+            ((RefType)returnType).resolveRef(classCache);
+        }
+
         for (Instruction instr : code) {
             instr.link(classCache, this);
         }

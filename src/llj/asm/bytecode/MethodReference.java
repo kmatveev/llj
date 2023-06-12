@@ -65,8 +65,19 @@ public class MethodReference extends ClassMemberReference<MethodData> {
     }
 
     public boolean link(Resolver<ClassData, String> classCache) throws LinkException {
+
+        for (Type paramType : paramTypes) {
+            if (paramType.type == TypeType.REF) {
+                ((RefType)paramType).resolveRef(classCache);
+            }
+        }
+        if (expectedReturnType.type == TypeType.REF) {
+            ((RefType)expectedReturnType).resolveRef(classCache);
+        }
+
         if (classCache.resolveAndCache(classRef)) {
             ClassData classData = classRef.get();
+            // even if ref params will not be resolved, we will be able to find method by param refs
             method = classData.getMethod(methodName, paramTypes);
             if (method == null) {
                 throw new LinkException("Cannot resolve method. Class " + classData.toString() + " doesn't contain a method with name " + methodName + " and type signature ... ");

@@ -31,7 +31,7 @@ public class ElementValuePair {
             ConstantRef<StringConstant> name = ConstantRef.readFrom(pool, in);
             length -= ConstantRef.getSize();
             part = "tag";
-            if (length < SIZE_SHORT) throw new ReadException("Attempt to read tag beyond provided limit");
+            if (length < SIZE_CHAR) throw new ReadException("Attempt to read tag beyond provided limit");
             char tag = BinIOTools.getUnsignedChar(in);
             length -= SIZE_CHAR;
             part = "value";

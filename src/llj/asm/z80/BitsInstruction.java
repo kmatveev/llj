@@ -85,7 +85,7 @@ public class BitsInstruction extends Instruction {
 
     public static BitsInstruction decodeInitial(int code, int prefix1, int prefix2) {
         int indexPrefix = -1;
-        if ((prefix1 == 0xDD) || (prefix1 == 0xFD)) {
+        if ((prefix1 == IX_PREFIX) || (prefix1 == IY_PREFIX)) {
             if (prefix2 != 0xCB) {
                 return null;
             }
@@ -107,36 +107,36 @@ public class BitsInstruction extends Instruction {
             return null;
         }
 
-        int c1 = code & 0x07;
         Operand op;
-        if (c1 == 0) {
-            op = Operand.reg8(Operand.Reg8.REG_B);
-        } else if (c1 == 1) {
-            op = Operand.reg8(Operand.Reg8.REG_C);
-        } else if (c1 == 2) {
-            op = Operand.reg8(Operand.Reg8.REG_D);
-        } else if (c1 == 3) {
-            op = Operand.reg8(Operand.Reg8.REG_E);
-        } else if (c1 == 4) {
-            op = Operand.reg8(Operand.Reg8.REG_H);
-        } else if (c1 == 5) {
-            op = Operand.reg8(Operand.Reg8.REG_L);
-        } else if (c1 == 6) {
-            if (indexPrefix == IX_PREFIX) {
-                partial = true;
-                op = Operand.memRegPtr(Operand.Reg16.REG_IX);
-            } else if (indexPrefix == IY_PREFIX) {
-                partial = true;
-                op = Operand.memRegPtr(Operand.Reg16.REG_IY);
-            } else {
-                op = Operand.memRegPtr(Operand.Reg16.REG_HL);
-            }
-        } else if (c1 == 7) {
-            op = Operand.reg8(Operand.Reg8.REG_A);
+        // although this behaviour is undocumented, if ix/iy prefix is present then op is memptr_reg, regardless of c1
+        if (indexPrefix == IX_PREFIX) {
+            partial = true;
+            op = Operand.memRegPtrIndex(Operand.Reg16.REG_IX, 0);
+        } else if (indexPrefix == IY_PREFIX) {
+            partial = true;
+            op = Operand.memRegPtrIndex(Operand.Reg16.REG_IY, 0);
         } else {
-            throw new RuntimeException();
+            int c1 = code & 0x07;
+            if (c1 == 0) {
+                op = Operand.reg8(Operand.Reg8.REG_B);
+            } else if (c1 == 1) {
+                op = Operand.reg8(Operand.Reg8.REG_C);
+            } else if (c1 == 2) {
+                op = Operand.reg8(Operand.Reg8.REG_D);
+            } else if (c1 == 3) {
+                op = Operand.reg8(Operand.Reg8.REG_E);
+            } else if (c1 == 4) {
+                op = Operand.reg8(Operand.Reg8.REG_H);
+            } else if (c1 == 5) {
+                op = Operand.reg8(Operand.Reg8.REG_L);
+            } else if (c1 == 6) {
+                op = Operand.memRegPtr(Operand.Reg16.REG_HL);
+            } else if (c1 == 7) {
+                op = Operand.reg8(Operand.Reg8.REG_A);
+            } else {
+                throw new RuntimeException();
+            }
         }
-
         int c2 = code & 0x38;
         int bitIndex = c2 / 8;
 

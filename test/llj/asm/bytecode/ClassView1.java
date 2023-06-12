@@ -4,13 +4,12 @@ import llj.packager.jclass.ClassFileFormat;
 import llj.packager.jclass.FormatException;
 import llj.util.ReadException;
 import llj.util.ref.MapResolver;
+import llj.util.swing.ZipFilesystemView;
 
 import javax.swing.AbstractAction;
 import javax.swing.AbstractListModel;
 import javax.swing.BorderFactory;
-import javax.swing.Box;
 import javax.swing.DefaultListModel;
-import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -23,17 +22,13 @@ import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
-import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
-import javax.swing.JToolBar;
 import javax.swing.JTree;
 import javax.swing.ListModel;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
-import javax.swing.event.CaretEvent;
-import javax.swing.event.CaretListener;
 import javax.swing.event.EventListenerList;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
@@ -46,34 +41,27 @@ import javax.swing.event.TreeModelListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.Highlighter;
-import javax.swing.text.JTextComponent;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Font;
-import java.awt.Graphics;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
-import java.awt.Panel;
-import java.awt.Rectangle;
-import java.awt.Shape;
 import java.awt.event.ActionEvent;
-import java.awt.event.InvocationEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.file.FileSystems;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
@@ -86,6 +74,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.zip.ZipFile;
 
 import static javax.swing.event.ListDataEvent.CONTENTS_CHANGED;
 
@@ -110,9 +99,8 @@ public class ClassView1 {
 //    private final LocalVarsTableModel localVarsTableModel;
     // private final DependentClassesTableModel dependentClassesTableModel;
 
-    private final ClasspathListModel classpathsListModel;
-    private final JList classpathsList;
     private final List<File> classPathEntries = new ArrayList<File>();
+    private final Map<File, List<ClassData>> classPathClasses = new HashMap<File, List<ClassData>>();
 
     private final JPopupMenu codePopupMenu = new JPopupMenu(), classpathPopuMenu = new JPopupMenu();
     
@@ -144,7 +132,7 @@ public class ClassView1 {
                             File selected = classChooser.getSelectedFile();
                             try {
                                 if (selected.exists()) {
-                                    setFile(selected);
+                                    addClassFile(selected);
                                 }
                             } catch (Exception ex) {
                                 // TODO
@@ -159,25 +147,34 @@ public class ClassView1 {
             }
             
             {
-
-                JMenuItem addClasspathButton = new JMenuItem(new AbstractAction("Add dir") {
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            JFileChooser dirChooser = new JFileChooser(lastDir);
-                            dirChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-                            int status = dirChooser.showDialog(window, "Choose");
-                            if (status == JFileChooser.APPROVE_OPTION) {
-                                File selectedFile = dirChooser.getSelectedFile();
-                                if (!classPathEntries.contains(selectedFile)) {
-                                    classPathEntries.add(selectedFile);
+                JMenuItem openClasspathEntryItem = new JMenuItem(new AbstractAction("Add to classpath") {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        JFileChooser classChooser = new JFileChooser(lastDir);
+                        classChooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+                        int result = classChooser.showOpenDialog(window);
+                        if (result == JFileChooser.APPROVE_OPTION) {
+                            File selected = classChooser.getSelectedFile();
+                            try {
+                                if (selected.exists()) {
+                                    if (!classPathEntries.contains(selected)) {
+                                        classPathEntries.add(selected);
+                                        classPathClasses.put(selected, new ArrayList<>());
+                                        classMembersTreeModel.classpathAdded(classPathEntries.size() - 1);
+                                    }
                                 }
-                                classpathsListModel.changed();
+                            } catch (Exception ex) {
+                                // TODO
+                                ex.printStackTrace();
                             }
                         }
-                    });
-                
-                fileMenu.add(addClasspathButton);
+
+                    }
+
+                });
+                fileMenu.add(openClasspathEntryItem);
             }
+
             
             {
                 JMenuItem clearItem = new JMenuItem(new AbstractAction("Clear") {
@@ -213,13 +210,6 @@ public class ClassView1 {
             JSplitPane split2 = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
             contentPane.add(split2, BorderLayout.CENTER);
 
-            {
-
-                JTabbedPane navigationTabs = new JTabbedPane(JTabbedPane.BOTTOM);
-                navigationTabs.setPreferredSize(new Dimension(200, 300));
-
-                split2.setLeftComponent(navigationTabs);
-
                 {
                     classMembersTreeModel = new ClassMembersTreeModel();
                     classMembersTree = new JTree(classMembersTreeModel);
@@ -227,8 +217,8 @@ public class ClassView1 {
                     // classMembersTree.setRootVisible(false);
                     classMembersTree.setShowsRootHandles(true);
 
-                    navigationTabs.addTab("Classes", new JScrollPane(classMembersTree));
-                    
+                    split2.setLeftComponent(new JScrollPane(classMembersTree));
+                    split2.getLeftComponent().setPreferredSize(new Dimension(200, 300));
 
                     DefaultTreeCellRenderer renderer = (DefaultTreeCellRenderer) classMembersTree.getCellRenderer();
                     renderer.setLeafIcon(null);
@@ -239,9 +229,9 @@ public class ClassView1 {
                         @Override
                         public void valueChanged(TreeSelectionEvent e) {
                             TreePath path = e.getPath();
-                            if (path.getPathCount() == 3) {
-                                ClassData classData = (ClassData) path.getPathComponent(1);
-                                MethodData methodData = getMethodBySignature(classData, (String) path.getPathComponent(2));
+                            if (path.getPathCount() == 4) {
+                                ClassData classData = (ClassData) path.getPathComponent(2);
+                                MethodData methodData = getMethodBySignature(classData, (String) path.getPathComponent(3));
                                 methodSelected(methodData);
                             } else {
                                 // ClassData classData = path.getPathComponent(1);
@@ -250,22 +240,66 @@ public class ClassView1 {
                     });
                     classMembersTree.expandPath(new TreePath(classMembersTreeModel.getRoot()));
 
+                    JPopupMenu treePopupMenu = new JPopupMenu();
+
+                    classMembersTree.addMouseListener(new MouseAdapter() {
+                        @Override
+                        public void mouseClicked(MouseEvent e) {
+                            if (SwingUtilities.isRightMouseButton(e)) {
+
+                                int row = classMembersTree.getClosestRowForLocation(e.getX(), e.getY());
+                                classMembersTree.setSelectionRow(row);
+                                Object lastPathComp = classMembersTree.getSelectionPath().getLastPathComponent();
+                                if (lastPathComp instanceof java.io.File) {
+                                    for (int i = 0; i < treePopupMenu.getSubElements().length; i++) {
+                                        treePopupMenu.remove(i);
+                                    }
+                                    JMenuItem addClassMenuItem = new JMenuItem("Add class");
+                                    addClassMenuItem.setAction(new AbstractAction("Add class") {
+                                        @Override
+                                        public void actionPerformed(ActionEvent e) {
+
+                                            File classPath = (File)lastPathComp;
+
+                                            try {
+                                                if (classPath.isFile() && (classPath.getName().endsWith(".jar") || classPath.getName().endsWith(".jmod"))) {
+                                                    ZipFile zipFile = new ZipFile(classPath);
+
+                                                    JFileChooser classChooser = new JFileChooser(new ZipFilesystemView(zipFile));
+                                                    classChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                                                    int result = classChooser.showOpenDialog(window);
+                                                    if (result == JFileChooser.APPROVE_OPTION) {
+                                                        File selected = classChooser.getSelectedFile();
+                                                        String selectedPath = selected.getPath().replace(File.separator, "/");
+                                                        if (selectedPath.startsWith("/")) selectedPath = selectedPath.substring(1);
+                                                        InputStream classInputStream = zipFile.getInputStream(zipFile.getEntry(selectedPath));
+                                                        ClassData classData = addClass(classInputStream);
+                                                        List<ClassData> classList = classPathClasses.computeIfAbsent(classPath, x -> new ArrayList<ClassData>());
+                                                        classList.add(classData);
+                                                        classMembersTreeModel.classAdded(classPath, classes.size() - 1);
+                                                    }
+
+
+                                                }
+                                            } catch (Exception exc) {
+                                                exc.printStackTrace();
+                                            }
+
+
+                                        }
+                                    });
+                                    treePopupMenu.add(addClassMenuItem);
+                                    treePopupMenu.show(e.getComponent(), e.getX(), e.getY());
+                                }
+
+                            }
+                        }
+                    });
+
                     // DON'T use preferred size on JTree, or scrollbars don't appear if JTree doesn't fit into JScrollPane
-                    // classMembersTree.setPreferredSize(new Dimension(150, 300));
+
                 }
 
-                {
-                    classpathsListModel = new ClasspathListModel();
-                    classpathsList = new JList(classpathsListModel);
-
-                    navigationTabs.addTab("Locations", new JScrollPane(classpathsList));
-
-                    // DON'T use preferred size on JTree, or scrollbars don't appear if JTree doesn't fit into JScrollPane
-                    // classMembersTree.setPreferredSize(new Dimension(150, 300));
-                }
-                
-                
-            }
 
 
             codePopupMenu.add(new AbstractAction("Info") {
@@ -639,38 +673,49 @@ public class ClassView1 {
         instrInfoFrame.setVisible(true);
     }
 
-    private void setFile(File file) throws Exception {
+    private void addClassFile(File file) throws Exception {
 
         Path path = FileSystems.getDefault().getPath(file.getAbsolutePath());
         lastDir = path.getParent().toFile();
-        
-        if (!classPathEntries.contains(lastDir)) {
-            classPathEntries.add(lastDir);
+
+        ClassData classData = addClass(path);
+        if (classData != null) {
+            String[] packageComponents = classData.getPackageComponents();
+            File packageDir = lastDir;
+            for (int i = packageComponents.length - 1; i >= 0; i--) {
+                if (packageDir.getName().equals(packageComponents[i])) {
+                    packageDir = packageDir.getParentFile();
+                }
+            }
+
+            if (!classPathEntries.contains(packageDir)) {
+                classPathEntries.add(packageDir);
+                classMembersTreeModel.classpathAdded(classPathEntries.size() - 1);
+            }
+
+            List<ClassData> classList = classPathClasses.computeIfAbsent(packageDir, x -> new ArrayList<ClassData>());
+            classList.add(classData);
+
+            classMembersTreeModel.classAdded(packageDir, classes.size() - 1);
+
         }
-        classpathsListModel.changed();
 
-        addClass(path);
-
-//        methodsList.setModel(new AbstractListModel() {
-//
-//            @Override
-//            public int getSize() {
-//                return classData.methods.size();
-//            }
-//
-//            @Override
-//            public Object getElementAt(int index) {
-//                return classData.methods.get(index).name;
-//            }
-//        });
 
     }
 
-    private void addClass(Path path) throws IOException, ReadException, FormatException, LinkException {
+    private ClassData addClass(Path path) throws IOException, ReadException, FormatException, LinkException {
         Set<OpenOption> opts = new HashSet<OpenOption>();
         opts.add(StandardOpenOption.READ);
         FileChannel fileChannel = FileChannel.open(path, opts);
 
+        return addClass(fileChannel);
+    }
+
+    private ClassData addClass(InputStream inputStream) throws IOException, ReadException, FormatException, LinkException {
+        return addClass(Channels.newChannel(inputStream));
+    }
+
+    private ClassData addClass(ReadableByteChannel fileChannel) throws ReadException, FormatException, LinkException {
         ClassFileFormat classFormat = ClassFileFormat.readFrom(fileChannel);
 
         List<String> errors = classFormat.validate();
@@ -678,7 +723,7 @@ public class ClassView1 {
         ClassData classData = new ClassData(classFormat);
 
         classes.add(classData);
-        
+
         cache.cache.put(classData.name, classData);
         classData.linkAll(cache, false);
         for (ClassData prevClass : classes) {
@@ -692,7 +737,7 @@ public class ClassView1 {
             }
         }
 
-        classMembersTreeModel.classAdded(classes.size() - 1);
+        return classData;
     }
 
     public void methodSelected(MethodData methodData) {
@@ -908,7 +953,9 @@ public class ClassView1 {
         @Override
         public Object getChild(Object parent, int index) {
             if (parent.equals(ROOT)) {
-                return classes.get(index);
+                return classPathEntries.get(index);
+            } else if (parent instanceof java.io.File) {
+                return classPathClasses.get(parent).get(index);
             } else if (parent instanceof ClassData) {
                 ClassData classData = (ClassData)parent;
                 return classData.methods.get(index).toSignature();
@@ -920,7 +967,9 @@ public class ClassView1 {
         @Override
         public int getChildCount(Object parent) {
             if (parent.equals(ROOT)) {
-                return classes.size();
+                return classPathEntries.size();
+            } else if (parent instanceof java.io.File) {
+                return classPathClasses.get(parent).size();
             } else if (parent instanceof ClassData) {
                 ClassData classData1 = (ClassData)parent;
                 return classData1.methods.size();
@@ -932,6 +981,8 @@ public class ClassView1 {
         @Override
         public boolean isLeaf(Object node) {
             if (node.equals(ROOT)) {
+                return false;
+            } else if (node instanceof java.io.File) {
                 return false;
             } else if (node instanceof ClassData) {
                 return false;
@@ -951,7 +1002,9 @@ public class ClassView1 {
         @Override
         public int getIndexOfChild(Object parent, Object child) {
             if (parent.equals(ROOT)) {
-                return classes.indexOf(child);
+                return classPathEntries.indexOf(child);
+            } else if (parent instanceof java.io.File) {
+                return classPathClasses.get(parent).indexOf(child);
             } else if (parent instanceof ClassData) {
                 return getMethodIndexBySignature((ClassData)parent, (String)child);
             } else {
@@ -969,13 +1022,22 @@ public class ClassView1 {
             eventListenerList.remove(TreeModelListener.class, l);
         }
 
-        public void classAdded(int classIndex) {
+        public void classAdded(File classPathEntry, int classIndex) {
             TreeModelListener[] listeners = eventListenerList.getListeners(TreeModelListener.class);
-            TreeModelEvent event = new TreeModelEvent(this, new Object[]{ROOT}, new int[]{classIndex}, new Object[]{classes.get(classIndex)});
+            TreeModelEvent event = new TreeModelEvent(this, new Object[]{ROOT, classPathEntry}, new int[]{classIndex}, new Object[]{classes.get(classIndex)});
             for (TreeModelListener listener : listeners) {
                 listener.treeNodesInserted(event);
             }
         }
+
+        public void classpathAdded(int classpathIndex) {
+            TreeModelListener[] listeners = eventListenerList.getListeners(TreeModelListener.class);
+            TreeModelEvent event = new TreeModelEvent(this, new Object[]{ROOT}, new int[]{classpathIndex}, new Object[]{classPathEntries.get(classpathIndex)});
+            for (TreeModelListener listener : listeners) {
+                listener.treeNodesInserted(event);
+            }
+        }
+
     }
 
     public static int getMethodIndexBySignature(ClassData classData, String signature) {

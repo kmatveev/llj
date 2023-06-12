@@ -1,5 +1,7 @@
 package llj.asm.bytecode;
 
+import llj.util.ref.Resolver;
+
 public class ArrayRefType extends RefType {
 
     // may be null, which means "any array" (useful, for example, as input type of 'arraylength' instruction)
@@ -47,6 +49,14 @@ public class ArrayRefType extends RefType {
             return elemType == null ? anotherArrayRef.elemType == null : elemType.equals(anotherArrayRef.elemType);
         } else {
             return false;
+        }
+    }
+
+    @Override
+    public void resolveRef(Resolver<ClassData, String> classCache) {
+        super.resolveRef(classCache);
+        if (elemType != null && elemType instanceof RefType) {
+            ((RefType)elemType).resolveRef(classCache);
         }
     }
 }

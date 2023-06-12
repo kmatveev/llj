@@ -112,8 +112,6 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
             throw new PEFormatException(e);
         }
 
-        readCOFFOptionalHeader(in, readBuffer);
-
         if (coffOptionalHeaderPE32 != null) {
             if ((coffOptionalHeaderPE32.dataDirectory.size() > EXPORTS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(EXPORTS_INDEX).VirtualAddress > 0) {
                 long exportDirTableRva = coffOptionalHeaderPE32.dataDirectory.get(EXPORTS_INDEX).VirtualAddress;
@@ -235,6 +233,12 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
             for (int i = 0; i < entry.numEntries; i++) {
                 ExportAddressTableEntry addressTableEntry = new ExportAddressTableEntry(BinIOTools.getUnsignedInt(exportAddressTableRaw));
                 exports.exportedFunctions.add(addressTableEntry);
+                Section exportedDataSection = findSectionByRVA(addressTableEntry.exportRvaOrForwarderRva);
+                if (exportedDataSection == section) {
+                    // if exportRvaOrForwarderRva points to exports section, then it is a forwarder value, which we can read and cache
+                    String forwarderValue = exportedDataSection.getStringByVirtualAddress(addressTableEntry.exportRvaOrForwarderRva);
+                    addressTableEntry.forwarderValue = forwarderValue;
+                }
             }
         }
 

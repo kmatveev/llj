@@ -1,5 +1,6 @@
 package llj.packager.jclass.constants;
 
+import llj.packager.jclass.FormatException;
 import llj.util.ReadException;
 
 import java.io.IOException;
@@ -47,5 +48,10 @@ public class MethodTypeConstant extends Constant {
             return "<<error>>";
         }
     }
+
+    public String resolveValue() throws FormatException {
+        return typeRef.resolve().value;
+    }
+
     
 }

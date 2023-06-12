@@ -35,7 +35,7 @@ public class TestDecodeEncode {
 
         LdInstruction ldDecoded = LdInstruction.decodeInitial(code, prefix);
         if (ldDecoded != null) {
-            LdInstruction result = new LdInstruction(ldDecoded.op1, ldDecoded.op2);
+            LdInstruction result = new LdInstruction(ldDecoded.opDest, ldDecoded.opSrc);
             if (result.tstates != ldDecoded.tstates) {
                 throw new RuntimeException();
             }
@@ -44,7 +44,7 @@ public class TestDecodeEncode {
 
         Op2Instruction op2decoded = Op2Instruction.decodeInitial(code, prefix);
         if (op2decoded != null) {
-            return new Op2Instruction(op2decoded.operation, op2decoded.op1, op2decoded.op2);
+            return new Op2Instruction(op2decoded.operation, op2decoded.opDest, op2decoded.opSrc);
         }
 
         IncDecInstruction incDecDecoded = IncDecInstruction.decodeInitial(code, prefix);

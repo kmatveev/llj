@@ -106,6 +106,12 @@ public abstract class Attribute {
             public Attribute readFrom(ConstantPool pool, ConstantRef<StringConstant> name, ReadableByteChannel in, int length) throws ReadException {
                 return StackMapTable.readFrom(pool, name, in, length);
             }
+        },
+        BOOTSTRAP_METHODS("BootstrapMethods") {
+            @Override
+            public Attribute readFrom(ConstantPool pool, ConstantRef<StringConstant> name, ReadableByteChannel in, int length) throws ReadException {
+                return BootstrapMethodsAttribute.readFrom(pool, name, in, length);
+            }
         }
         ;
 

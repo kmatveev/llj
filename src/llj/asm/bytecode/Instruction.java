@@ -1,12 +1,7 @@
 package llj.asm.bytecode;
 
 import llj.packager.jclass.FormatException;
-import llj.packager.jclass.constants.ClassRefConstant;
-import llj.packager.jclass.constants.Constant;
-import llj.packager.jclass.constants.ConstantPool;
-import llj.packager.jclass.constants.FieldRefConstant;
-import llj.packager.jclass.constants.InterfaceMethodRefConstant;
-import llj.packager.jclass.constants.MethodRefConstant;
+import llj.packager.jclass.constants.*;
 import llj.util.BinTools;
 import llj.util.ref.Resolver;
 
@@ -37,10 +32,10 @@ public abstract class Instruction {
 
     public abstract Effect getEffect();
 
-    public static List<Instruction> readCode(byte[] source, ConstantPool constPool) throws FormatException {
+    public static List<Instruction> readCode(byte[] source, ConstantPool constPool, List<BootstrapMethodData> bootstrapMethods) throws FormatException {
         ArrayList<Instruction> instructions = new ArrayList<Instruction>();
         for (int i = 0; i < source.length;) {
-            Instruction instr = getInstruction(source, i, constPool);
+            Instruction instr = getInstruction(source, i, constPool, bootstrapMethods);
             instr.index = instructions.size();
             instructions.add(instr);
             i += instr.size;
@@ -49,11 +44,11 @@ public abstract class Instruction {
         return instructions;
     }
 
-    public static Instruction getInstruction(byte[] source, int i, ConstantPool constPool) throws FormatException {
-        return getInstruction(source, i, constPool, false);
+    public static Instruction getInstruction(byte[] source, int i, ConstantPool constPool, List<BootstrapMethodData> bootstrapMethods) throws FormatException {
+        return getInstruction(source, i, constPool, bootstrapMethods, false);
     }
 
-    public static Instruction getInstruction(byte[] source, int i, ConstantPool constPool, boolean wide) throws FormatException {
+    public static Instruction getInstruction(byte[] source, int i, ConstantPool constPool, List<BootstrapMethodData> bootstrapMethods, boolean wide) throws FormatException {
         int code = 0xff & source[i];
         InstructionCode instrCode = InstructionCode.getByCode(code);
         int size = instrCode.size;
@@ -164,8 +159,13 @@ public abstract class Instruction {
                 instr = new FieldRefInstruction(instrCode, fieldRef);
                 break;
             }
-            case invokedynamic:
-                throw new RuntimeException();
+            case invokedynamic: {
+                int index = BinTools.getShort(source, i + 1);
+                Constant cnst = constPool.get(index);
+                if (cnst.getType() != Constant.ConstType.INVOKE_DYNAMIC) throw new FormatException("InvokeDynamic call site description expected");
+                instr = new InvokeDynamicInstruction(instrCode, CallSiteData.readFrom((InvokeDynamicConstant) cnst, bootstrapMethods));
+                break;
+            }
             case invokeinterface:
             {
                 int index = BinTools.getShort(source, i + 1);
@@ -525,7 +525,7 @@ public abstract class Instruction {
             }
             case wide:
             {
-                instr = getInstruction(source, i + 1, constPool, true);
+                instr = getInstruction(source, i + 1, constPool, bootstrapMethods, true);
                 break;
             }
             default:

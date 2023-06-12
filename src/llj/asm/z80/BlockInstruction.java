@@ -51,7 +51,7 @@ public class BlockInstruction extends Instruction {
         this.opCode = code;
     }
 
-    public BlockInstruction decodeInitial(int code, int prefix1) {
+    public static BlockInstruction decodeInitial(int code, int prefix1) {
         if (prefix1 == 0xED) {
             if ((code >= 0xA0) && (code <= 0xBF)) {
 
@@ -66,11 +66,11 @@ public class BlockInstruction extends Instruction {
                 } else if (c1 == 3) {
                     operation = Operation.OUT;
                 } else {
-                    throw new RuntimeException();
+                    return null;
                 }
 
                 boolean repeated, increment;
-                int c2 = code & 0x3F;
+                int c2 = code & 0x38;
                 if (c2 == 0x20) {
                     repeated = false;
                     increment = true;

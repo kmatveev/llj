@@ -211,7 +211,7 @@ public class VisualPE {
                         formatOk = true;
                     } catch (PEFormatException e) {
                         if (pe.peSignatureInPlace) {
-                            JOptionPane.showMessageDialog(frame, "Was unable to read selected file", "File read error", JOptionPane.ERROR_MESSAGE);
+                            JOptionPane.showMessageDialog(frame, e.getMessage(), "File read error", JOptionPane.ERROR_MESSAGE);
                             formatOk = false;
                         } else {
                             // no PE signature, so it's not a PE format;
@@ -422,10 +422,12 @@ public class VisualPE {
             importsNode = new DefaultMutableTreeNode("Imports");
             peNode.add(importsNode);
             IdentityHashMap<DefaultMutableTreeNode, ImportBlock> importBlockNodes = new IdentityHashMap<>();
-            for (ImportBlock importBlock : peFormat.imports) {
-                DefaultMutableTreeNode importBlockNode = new DefaultMutableTreeNode(importBlock.name);
-                importBlockNodes.put(importBlockNode, importBlock);
-                importsNode.add(importBlockNode);
+            if (peFormat.imports != null) {
+                for (ImportBlock importBlock : peFormat.imports) {
+                    DefaultMutableTreeNode importBlockNode = new DefaultMutableTreeNode(importBlock.name);
+                    importBlockNodes.put(importBlockNode, importBlock);
+                    importsNode.add(importBlockNode);
+                }
             }
 
             IdentityHashMap<DefaultMutableTreeNode, ResourceEntry> resourceNodes = new IdentityHashMap<>();
@@ -442,10 +444,12 @@ public class VisualPE {
         DefaultMutableTreeNode relocationsNode = new DefaultMutableTreeNode("PE relocations");
         peNode.add(relocationsNode);
         IdentityHashMap<DefaultMutableTreeNode, BaseRelocationsBlock> relocationsBlockNodes = new IdentityHashMap<>();
-        for (BaseRelocationsBlock relocBlock : peFormat.baseRelocations) {
-            DefaultMutableTreeNode relocationsBlockNode = new DefaultMutableTreeNode(relocBlock.pageRva);
-            relocationsBlockNodes.put(relocationsBlockNode, relocBlock);
-            relocationsNode.add(relocationsBlockNode);
+        if (peFormat.baseRelocations != null) {
+            for (BaseRelocationsBlock relocBlock : peFormat.baseRelocations) {
+                DefaultMutableTreeNode relocationsBlockNode = new DefaultMutableTreeNode(relocBlock.pageRva);
+                relocationsBlockNodes.put(relocationsBlockNode, relocBlock);
+                relocationsNode.add(relocationsBlockNode);
+            }
         }
 
 
@@ -785,10 +789,11 @@ public class VisualPE {
                         exportsRowAdder.addSingleComponentWholeRow(exportsPanel, new JSeparator(), new Insets(5, 5, 5, 5));
 
                         DefaultTableModel exportsTableModel = new DefaultTableModel();
-                        exportsTableModel.setColumnIdentifiers(new String[]{"Name RVA", "Name section+offset", "Name", "Export address index", "Export address RVA", "Export address section+offset"});
+                        exportsTableModel.setColumnIdentifiers(new String[]{"Name RVA", "Name section+offset", "Name", "Export address index", "Export address RVA", "Export address section+offset", "Export forwarding"});
 
                         for (int i = 0; i < peFormat.exports.numFunctionEntries(); i++) {
-                            long exportRvaOrForwarderRva = peFormat.exports.getByOrdinal(i).exportRvaOrForwarderRva;
+                            ExportAddressTableEntry exportAddressEntry = peFormat.exports.getByOrdinal(i);
+                            long exportRvaOrForwarderRva = exportAddressEntry.exportRvaOrForwarderRva;
                             long namePointerRva = peFormat.exports.exportTableEntry.namePointerRva + i * 4;
                             exportsTableModel.addRow(new String[]{
                                     String.valueOf(namePointerRva),
@@ -796,7 +801,8 @@ public class VisualPE {
                                     peFormat.exports.exportedFunctionNames.get(i),
                                     String.valueOf(peFormat.exports.exportedFunctionOrdinalIndexes.get(i)),
                                     String.valueOf(exportRvaOrForwarderRva),
-                                    peFormat.findSectionByRVA(exportRvaOrForwarderRva).resolvedName + "+" + String.valueOf(exportRvaOrForwarderRva - peFormat.findSectionByRVA(exportRvaOrForwarderRva).sectionHeader.virtualAddress)
+                                    peFormat.findSectionByRVA(exportRvaOrForwarderRva).resolvedName + "+" + String.valueOf(exportRvaOrForwarderRva - peFormat.findSectionByRVA(exportRvaOrForwarderRva).sectionHeader.virtualAddress),
+                                    exportAddressEntry.forwarderValue == null ? "" : exportAddressEntry.forwarderValue
                             });
                         }
 
@@ -1061,10 +1067,13 @@ public class VisualPE {
 
         sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(section.getOffsetInFile())), makeFiller());
         sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Size of raw data in file: "), new JLabel(getDecAndHexStr(section.sectionHeader.sizeOfRawData)), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("End of raw data in file: "), new JLabel(getDecAndHexStr(section.getOffsetInFile() + section.sectionHeader.sizeOfRawData)), makeFiller());
         sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Num of relocations: "), new JLabel(getDecAndHexStr(section.relocations.size())), makeFiller());
         sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Pointer to relocations: "), new JLabel(getDecAndHexStr(section.sectionHeader.pointerToRelocations)), makeFiller());
         sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Size of relocations data in file: "), new JLabel(getDecAndHexStr(section.sectionHeader.numberOfRelocations * RelocationEntry.SIZE)), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("End of relocations data in file: "), new JLabel(getDecAndHexStr(section.sectionHeader.pointerToRelocations + section.sectionHeader.numberOfRelocations * RelocationEntry.SIZE)), makeFiller());
         sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Total size of section data in file: "), new JLabel(getDecAndHexStr(section.getSizeInFile())), makeFiller());
+        sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("End of section data in file: "), new JLabel(getDecAndHexStr(section.getOffsetInFile() + section.getSizeInFile())), makeFiller());
         sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Virtual address: "), new JLabel(getDecAndHexStr(section.sectionHeader.virtualAddress)), makeFiller());
         sectionRowAdder.addRow(sectionDataOverviewPanel, new JLabel("Virtual size: "), new JLabel(getDecAndHexStr(section.sectionHeader.physicalAddressOrVirtualSize)), makeFiller());
 
@@ -1933,7 +1942,7 @@ public class VisualPE {
     }
 
     public void processChildren(ResourceEntry directory, DefaultMutableTreeNode directoryNode, IdentityHashMap<DefaultMutableTreeNode, ResourceEntry> resourceNodes, int level) {
-        if (directory.directoryEntry != null) {
+        if (directory.directoryEntry != null && directory.resolvedSubDirectory != null) {
             for (ResourceEntry entry : directory.resolvedSubDirectory.entries) {
                 String name = entry.getEntryName(level == 1);
                 DefaultMutableTreeNode entryNode = new DefaultMutableTreeNode(name);

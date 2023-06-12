@@ -30,11 +30,31 @@ public abstract class Instruction {
 
     public static class Operand {
 
-        public static enum Type { REG8, REG16, IMM8, IMM16, MEM_PTR_REG, MEM_PTR_IMM16, PORT_PTR_IMM8}
+        public static enum Type { REG8, REG16, IMM8, IMM16, MEM_PTR_REG, MEM_PTR_IMM16, PORT_NUM_IMM8, PORT_NUM_REG }
 
-        public static enum Reg8 { REG_A, REG_B, REG_C, REG_D, REG_E, REG_H, REG_L, REG_I, REG_R, REG_IXH, REG_IXL, REG_IYH, REG_IYL }
+        public static enum Reg8 {
+            REG_A, REG_B, REG_C, REG_D, REG_E, REG_H, REG_L, REG_I, REG_R, REG_IXH, REG_IXL, REG_IYH, REG_IYL;
+            public static Reg8 parse(String regArg) {
+                for (Reg8 reg : values()) {
+                    if (reg.name().substring(4).equals(regArg)) {
+                        return reg;
+                    }
+                }
+                return null;
+            }
+        }
 
-        public static enum Reg16 { REG_AF, REG_BC, REG_DE, REG_HL, REG_IX, REG_IY, REG_SP }
+        public static enum Reg16 {
+            REG_AF, REG_BC, REG_DE, REG_HL, REG_IX, REG_IY, REG_SP;
+            public static Reg16 parse(String regArg) {
+                for (Reg16 reg : values()) {
+                    if (reg.name().substring(4).equals(regArg)) {
+                        return reg;
+                    }
+                }
+                return null;
+            }
+        }
 
         private static final Reg8[] REG_B_C = {Reg8.REG_B, Reg8.REG_C};
         private static final Reg8[] REG_D_E = {Reg8.REG_D, Reg8.REG_E};
@@ -104,8 +124,13 @@ public abstract class Instruction {
         }
 
         public static Operand port(int imm8) {
-            return new Operand(Type.PORT_PTR_IMM8, null, null, imm8, 0);
+            return new Operand(Type.PORT_NUM_IMM8, null, null, imm8, 0);
         }
+
+        public static Operand portReg(Reg16 reg16) {
+            return new Operand(Type.PORT_NUM_REG, null, reg16, 0, 0);
+        }
+
 
     }
 

@@ -16,6 +16,7 @@ public class RegAInstruction extends Instruction {
     private RegAInstruction(int code, int prefix1, Type type) {
         this.type = type;
         this.opCode = code;
+        this.prefix1 = prefix1;
     }
 
     private void getCode(Type type) {

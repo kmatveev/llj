@@ -1,5 +1,7 @@
 package llj.packager.winpe;
 
+import llj.packager.coff.Section;
+
 import java.util.ArrayList;
 import java.util.List;
 

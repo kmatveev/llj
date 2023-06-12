@@ -27,14 +27,14 @@ public class IoInstruction extends Instruction {
     public void getCode(boolean in, Operand op1, Operand op2) throws IncorrectOperandException {
         int code, prefix1;
         if (in) {
-            if (op2.type == Operand.Type.PORT_PTR_IMM8) {
+            if (op2.type == Operand.Type.PORT_NUM_IMM8) {
                 if ((op1.type == Operand.Type.REG8) && (op1.reg8 == REG_A)) {
                     code = 0xDB;
                     prefix1 = -1;
                 } else {
                     throw new IncorrectOperandException();
                 }
-            } else if ((op2.type == Operand.Type.MEM_PTR_REG) && (op2.reg16 == Operand.Reg16.REG_BC) && ((op1.type == Operand.Type.REG8) )) {
+            } else if ((op2.type == Operand.Type.PORT_NUM_REG) && (op2.reg16 == Operand.Reg16.REG_BC) && ((op1.type == Operand.Type.REG8) )) {
                 prefix1 = 0xED;
                 if (op1.reg8 == REG_B) {
                     code = 0x40;
@@ -59,14 +59,14 @@ public class IoInstruction extends Instruction {
                 throw new IncorrectOperandException();
             }
         } else {
-            if (op1.type == Operand.Type.PORT_PTR_IMM8) {
+            if (op1.type == Operand.Type.PORT_NUM_IMM8) {
                 if ((op2.type == Operand.Type.REG8) && (op2.reg8 == REG_A)) {
                     code = 0xD3;
                     prefix1 = -1;
                 } else {
                     throw new IncorrectOperandException();
                 }
-            } else if ((op1.type == Operand.Type.MEM_PTR_REG) && (op1.reg16 == Operand.Reg16.REG_BC) && ((op2.type == Operand.Type.REG8) )) {
+            } else if ((op1.type == Operand.Type.PORT_NUM_REG) && (op1.reg16 == Operand.Reg16.REG_BC) && ((op2.type == Operand.Type.REG8) )) {
                 prefix1 = 0xED;
                 if (op2.reg8 == REG_B) {
                     code = 0x41;
@@ -131,9 +131,9 @@ public class IoInstruction extends Instruction {
 
             int c1 = code & 0x07;
             if (c1 == 0) {
-                return new IoInstruction(code, prefix1, true, op, Operand.memRegPtr(Operand.Reg16.REG_BC), false);
+                return new IoInstruction(code, prefix1, true, op, Operand.portReg(Operand.Reg16.REG_BC), false);
             } else if (c1 == 1){
-                return new IoInstruction(code, prefix1, false, Operand.memRegPtr(Operand.Reg16.REG_BC), op, false);
+                return new IoInstruction(code, prefix1, false, Operand.portReg(Operand.Reg16.REG_BC), op, false);
             } else {
                 return null;
             }
