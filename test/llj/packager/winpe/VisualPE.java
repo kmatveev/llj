@@ -231,7 +231,7 @@ public class VisualPE {
                 createAnyFormatRenderer(file, displayFormatMap, "Windows PE");
                 createPEFormatRenderer(displayFormatMap, peFormat);
 
-            } else if (fileName.endsWith(".obj")) {
+            } else if (fileName.endsWith(".obj") || fileName.endsWith(".o")) {
 
                 OBJCOFFFormat objFormat = new OBJCOFFFormat();
                 try {
@@ -273,11 +273,11 @@ public class VisualPE {
 
             tree.repaint();
 
-            try {
-                fileChannel.close();
-            } catch (Exception e) {
-                // ignore
-            }
+//            try {
+//                fileChannel.close();
+//            } catch (Exception e) {
+//                // ignore
+//            }
 
 
         } catch (IOException e) {
@@ -1807,7 +1807,7 @@ public class VisualPE {
 
     }
 
-    public void createLIBFormatRenderer(Map<Object, DisplayFormat> displayFormatMap,  ARFormat arFormat, SeekableByteChannel fileChannel) {
+    public void createLIBFormatRenderer(Map<Object, DisplayFormat> displayFormatMap,  ARFormat arFormat, SeekableByteChannel fileChannel) throws IOException {
 
 
 
@@ -1816,6 +1816,10 @@ public class VisualPE {
         DefaultMutableTreeNode libNode = new DefaultMutableTreeNode("LIB");
         root.add(libNode);
 
+        int lookupTableIdx = arFormat.findLookupTable();
+        ARFormat.LookupTable lt = new ARFormat.LookupTable();
+        DefaultMutableTreeNode ltn = null;
+
         IdentityHashMap<DefaultMutableTreeNode, Integer> fileNodes = new IdentityHashMap<>();
         for (int i = 0; i < arFormat.itemHeaders.size(); i++ ) {
             ARFormat.FileHeader item = arFormat.itemHeaders.get(i);
@@ -1823,7 +1827,23 @@ public class VisualPE {
             DefaultMutableTreeNode fileNode = new DefaultMutableTreeNode(name);
             fileNodes.put(fileNode, i);
             libNode.add(fileNode);
+
+            if (i == lookupTableIdx) {
+                long dataOffset = arFormat.itemDataOffsets.get(i);
+                fileChannel.position(dataOffset);
+                ARFormat.FileHeader lookupTableHeader = arFormat.itemHeaders.get(i);
+                ByteBuffer fileData = ByteBuffer.allocate(lookupTableHeader.fileSize);
+                fileChannel.read(fileData);
+                fileData.flip();
+                lt.parse(fileData);
+
+                ltn = fileNode;
+            }
         }
+        DefaultMutableTreeNode lookupTableNode = ltn;
+
+
+
 
         treeModel.reload();
 
@@ -1840,10 +1860,20 @@ public class VisualPE {
 
                     GridBagByRowAdder libraryAdder = new GridBagByRowAdder(col1, col2, col4);
 
-//                    int dosTotalSize = (dosHeader.nBlocks - 1) * 512 + dosHeader.lastSize;
-//                    dosInfoAdder.addRow(libInfoPanel, new JLabel("DOS header size: "), new JLabel(String.valueOf(dosHeader.getDeclaredHeaderSize())), makeFiller());
-//                    dosInfoAdder.addRow(libInfoPanel, new JLabel("DOS payload size: "), new JLabel(String.valueOf(dosTotalSize - dosHeader.getDeclaredHeaderSize())), makeFiller());
-//                    dosInfoAdder.addRow(libInfoPanel, new JLabel("DOS exe total size: "), new JLabel(String.valueOf(dosTotalSize)), makeFiller());
+                    DefaultTableModel libraryTableModel = new DefaultTableModel();
+                    libraryTableModel.setColumnIdentifiers(new String[]{"File name", "Offset of header", "Offset of start of data", "Length of data"});
+
+                    for (int i = 0; i < arFormat.itemHeaders.size(); i++) {
+                        ARFormat.FileHeader fileHeader = arFormat.itemHeaders.get(i);
+                        libraryTableModel.addRow(new String[] {fileHeader.fileIdentifier, String.valueOf(arFormat.fileHeadersOffsets.get(i)), String.valueOf(arFormat.itemDataOffsets.get(i)),String.valueOf((int) fileHeader.fileSize)});
+                    }
+
+                    JTable libraryTable = new JTable(libraryTableModel);
+
+                    JScrollPane libraryScrollPane = new JScrollPane(libraryTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+                    libraryTable.setFillsViewportHeight(true);
+
+                    libraryAdder.addSingleComponentWholeRow(libInfoPanel, libraryScrollPane, new Insets(5, 5, 5, 5));
 
                     libraryAdder.addBottomFillerTo(libInfoPanel);
                     libInfoPanel.setBackground(UIManager.getColor("List.background"));
@@ -1857,40 +1887,66 @@ public class VisualPE {
 
                     JPanel libraryEntryPanel = new JPanel();
                     libraryEntryPanel.setLayout(new GridBagLayout());
-                    GridBagByRowAdder libraryEntryAdder = new GridBagByRowAdder(col1, col2, col4);
+
                     
                     try {
                         int fileIndex = fileNodes.get(path.getLastPathComponent());
-                        long dataOffset = arFormat.itemDataOffsets.get(fileIndex);
-                        int dataSize = arFormat.itemHeaders.get(fileIndex).fileSize;
 
-                        ByteBuffer fileData = ByteBuffer.allocate(dataSize);
-                        fileChannel.position(dataOffset);
-                        fileChannel.read(fileData);
-                        fileData.flip();
-                        COFFHeader coffHeader = new COFFHeader();
-                        coffHeader.readFrom(fileData);
-                        
-                        if (ImportHeader.canBeCreatedFrom(coffHeader)) {
-                            fileData.clear();
-                            ImportFormat importFormat = new ImportFormat();
-                            importFormat.readFrom(fileData);
+                        if (path.getLastPathComponent() == lookupTableNode) {
 
-                            for (String fieldName : new String[] {ImportHeader.Field.SIZE_OF_DATA.name(), ImportHeader.Field.ORDINAL_OR_HINT.name(), ImportHeader.Field.IMPORT_TYPE.name(), ImportHeader.Field.NAME_TYPE.name()}) {
+                            GridBagByRowAdder lookupTableAdder = new GridBagByRowAdder(col1, col4);
 
-                                JLabel nameLabel = new JLabel(fieldName + ":");
+                            DefaultTableModel lookupTableModel = new DefaultTableModel();
+                            lookupTableModel.setColumnIdentifiers(new String[]{"Symbol", "Offset in file"});
 
-                                String tooltipText = "<html>Offset:" + importFormat.header.getOffset(fieldName) + "<br>" + "Size:" + importFormat.header.getSize(fieldName) + "</html>";
+                            for (ARFormat.LookupTable.Entry entry : lt.entries) {
+                                lookupTableModel.addRow(new String[] {entry.name, String.valueOf(entry.offset)});
+                            }
 
-                                nameLabel.setToolTipText(tooltipText);
+                            JTable lookupTable = new JTable(lookupTableModel);
 
-                                // JLabel offsetLabel = new JLabel("(offset:" + format.coffHeader.getOffset(fieldName) + ";" + "size:" + format.coffHeader.getSize(fieldName) + ")");
-                                // JLabel valueLabel = new JLabel(format.header.getStringValue(fieldName));
-                                DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
-                                JTextField valueTextField = new JTextField(importFormat.header.getStringValue(fieldName, selectedDisplayFormat).get(), 30);
-                                // valueTextField.setEnabled(false);
-                                valueTextField.setEditable(false);
-                                valueTextField.setToolTipText(tooltipText);
+                            JScrollPane lookupTableScrollPane = new JScrollPane(lookupTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+                            lookupTable.setFillsViewportHeight(true);
+
+                            lookupTableAdder.addSingleComponentWholeRow(libraryEntryPanel, lookupTableScrollPane, new Insets(5, 5, 5, 5));
+
+                            lookupTableAdder.addBottomFillerTo(libraryEntryPanel);
+
+
+                        } else {
+
+                            GridBagByRowAdder libraryEntryAdder = new GridBagByRowAdder(col1, col2, col4);
+
+                            long dataOffset = arFormat.itemDataOffsets.get(fileIndex);
+                            int dataSize = arFormat.itemHeaders.get(fileIndex).fileSize;
+
+                            ByteBuffer fileData = ByteBuffer.allocate(dataSize);
+                            fileChannel.position(dataOffset);
+                            fileChannel.read(fileData);
+                            fileData.flip();
+                            COFFHeader coffHeader = new COFFHeader();
+                            coffHeader.readFrom(fileData);
+
+                            if (ImportHeader.canBeCreatedFrom(coffHeader)) {
+                                fileData.clear();
+                                ImportFormat importFormat = new ImportFormat();
+                                importFormat.readFrom(fileData);
+
+                                for (String fieldName : new String[]{ImportHeader.Field.SIZE_OF_DATA.name(), ImportHeader.Field.ORDINAL_OR_HINT.name(), ImportHeader.Field.IMPORT_TYPE.name(), ImportHeader.Field.NAME_TYPE.name()}) {
+
+                                    JLabel nameLabel = new JLabel(fieldName + ":");
+
+                                    String tooltipText = "<html>Offset:" + importFormat.header.getOffset(fieldName) + "<br>" + "Size:" + importFormat.header.getSize(fieldName) + "</html>";
+
+                                    nameLabel.setToolTipText(tooltipText);
+
+                                    // JLabel offsetLabel = new JLabel("(offset:" + format.coffHeader.getOffset(fieldName) + ";" + "size:" + format.coffHeader.getSize(fieldName) + ")");
+                                    // JLabel valueLabel = new JLabel(format.header.getStringValue(fieldName));
+                                    DisplayFormat selectedDisplayFormat = displayFormatMap.getOrDefault(fieldName, DisplayFormat.DEFAULT);
+                                    JTextField valueTextField = new JTextField(importFormat.header.getStringValue(fieldName, selectedDisplayFormat).get(), 30);
+                                    // valueTextField.setEnabled(false);
+                                    valueTextField.setEditable(false);
+                                    valueTextField.setToolTipText(tooltipText);
 
 //                                {
 //                                    JPopupMenu popup = new JPopupMenu();
@@ -1904,26 +1960,27 @@ public class VisualPE {
 //
 //                                }
 
-                                libraryEntryAdder.addRow(libraryEntryPanel, nameLabel, valueTextField, makeFiller());
+                                    libraryEntryAdder.addRow(libraryEntryPanel, nameLabel, valueTextField, makeFiller());
+
+                                }
+
+                                JTextField dllNameField = new JTextField(importFormat.dllName, 30);
+                                // dllNameField.setEnabled(false);
+                                dllNameField.setEditable(false);
+
+                                JTextField importedSymbolField = new JTextField(importFormat.importedSymbol, 30);
+                                // importedSymbolField.setEnabled(false);
+                                importedSymbolField.setEditable(false);
+
+
+                                libraryEntryAdder.addRow(libraryEntryPanel, new JLabel("DLL name: "), dllNameField, makeFiller());
+                                libraryEntryAdder.addRow(libraryEntryPanel, new JLabel("Function name: "), importedSymbolField, makeFiller());
+
 
                             }
-                            
-                            JTextField dllNameField = new JTextField(importFormat.dllName, 30);
-                            // dllNameField.setEnabled(false);
-                            dllNameField.setEditable(false);
+                            libraryEntryAdder.addBottomFillerTo(libraryEntryPanel);
 
-                            JTextField importedSymbolField = new JTextField(importFormat.importedSymbol, 30);
-                            // importedSymbolField.setEnabled(false);
-                            importedSymbolField.setEditable(false);
-
-
-
-                            libraryEntryAdder.addRow(libraryEntryPanel, new JLabel("DLL name: "), dllNameField, makeFiller());
-                            libraryEntryAdder.addRow(libraryEntryPanel, new JLabel("Function name: "), importedSymbolField, makeFiller());
-                            
                         }
-
-                        libraryEntryAdder.addBottomFillerTo(libraryEntryPanel);
                         libraryEntryPanel.setBackground(UIManager.getColor("List.background"));
 
                         libraryEntryPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));

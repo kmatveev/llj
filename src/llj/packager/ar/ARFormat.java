@@ -2,10 +2,12 @@ package llj.packager.ar;
 
 import llj.packager.Format;
 import llj.util.BinIOTools;
+import llj.util.BinTools;
 import llj.util.ReadException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -19,6 +21,7 @@ public class ARFormat implements Format {
     private static final byte[] SIGNATURE = "!<arch>\n".getBytes(StandardCharsets.US_ASCII);
 
     public List<FileHeader> itemHeaders = new ArrayList<>();
+    public List<Long> fileHeadersOffsets = new ArrayList<>();
     public List<Long> itemDataOffsets = new ArrayList<>();
 
     public void readFrom(SeekableByteChannel in) throws Exception  {
@@ -26,6 +29,7 @@ public class ARFormat implements Format {
 
         boolean hasNext = true;
         while (hasNext) {
+            fileHeadersOffsets.add(in.position());
             FileHeader item = new FileHeader();
             item.readFrom(in);
             itemHeaders.add(item);
@@ -170,6 +174,36 @@ public class ARFormat implements Format {
                 return null;
             } else {
                 return Integer.parseInt(strVal);
+            }
+        }
+
+
+    }
+
+    public static class LookupTable {
+
+        public List<Entry> entries = new ArrayList<>();
+
+        public static class Entry {
+            public int offset;
+            public String name;
+
+            public Entry(int offset, String name) {
+                this.offset = offset;
+                this.name = name;
+            }
+        }
+
+        public void parse(ByteBuffer bb) {
+            bb.order(ByteOrder.BIG_ENDIAN);
+            int numEntries = bb.getInt();
+            int[] offsets = new int[numEntries];
+            for (int i = 0; i < numEntries; i++) {
+                offsets[i] = bb.getInt();
+            }
+            for (int i = 0; i < numEntries; i++) {
+                String entryName = BinTools.readZeroTerminatedAsciiString(bb);
+                entries.add(new Entry(offsets[i], entryName));
             }
         }
 
