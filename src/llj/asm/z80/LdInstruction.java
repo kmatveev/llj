@@ -7,7 +7,6 @@ import static llj.asm.z80.Instruction.Operand.Reg8.REG_I;
 public class LdInstruction extends Instruction {
 
     public final Operand opDest, opSrc;
-    public int tstates;
 
     public LdInstruction(Operand opDest, Operand opSrc) throws IncorrectOperandException {
         this.opDest = opDest;
@@ -15,20 +14,18 @@ public class LdInstruction extends Instruction {
         setOpCode(opDest, opSrc);
     }
 
-    public LdInstruction(int opCode, int prefix1, Operand opDest, Operand opSrc, boolean partial, int tstates) {
+    public LdInstruction(int opCode, int prefix1, Operand opDest, Operand opSrc, boolean partial) {
         this.opDest = opDest;
         this.opSrc =opSrc;
         this.opCode = opCode;
         this.prefix1 = prefix1;
-        this.tstates = tstates;
     }
 
     private void setOpCode(Operand opDest, Operand opSrc) throws IncorrectOperandException {
         int code, prefix1 = -1;
-        int tstates;
+
         if (opDest.type == Operand.Type.REG16) {
             if (opSrc.type == Operand.Type.IMM16) {
-                tstates = 4 + 6;  // opcode fetch, imm16 fetch
                 if (opDest.reg16 == REG_BC) {
                     code = 0x01;
                 } else if (opDest.reg16 == Operand.Reg16.REG_DE) {
@@ -36,11 +33,9 @@ public class LdInstruction extends Instruction {
                 } else if (opDest.reg16 == Operand.Reg16.REG_HL) {
                     code = 0x21;
                 } else if (opDest.reg16 == REG_IX) {
-                    tstates += 4;  // prefix fetch
                     prefix1 = IX_PREFIX;
                     code = 0x21;
                 } else if (opDest.reg16 == REG_IY) {
-                    tstates += 4;  // prefix fetch
                     prefix1 = IY_PREFIX;
                     code = 0x21;
                 } else if (opDest.reg16 == Operand.Reg16.REG_SP) {
@@ -49,42 +44,33 @@ public class LdInstruction extends Instruction {
                     throw new RuntimeException();
                 }
             } else if (opSrc.type == Operand.Type.REG16) {
-                tstates = 4 + 2;  // opcode fetch, reg16 transfer
                 if ((opDest.reg16 == Operand.Reg16.REG_SP) && (opSrc.reg16 == Operand.Reg16.REG_HL)) {
                     code = 0xF9;
                 } else if ((opDest.reg16 == Operand.Reg16.REG_SP) && (opSrc.reg16 == REG_IX)) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IX_PREFIX;
                     code = 0xF9;
                 } else if ((opDest.reg16 == Operand.Reg16.REG_SP) && (opSrc.reg16 == REG_IY)) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IY_PREFIX;
                     code = 0xF9;
                 } else {
                     throw new IncorrectOperandException();
                 }
             } else if (opSrc.type == Operand.Type.MEM_PTR_IMM16) {
-                tstates = 4 + 6 + 6; // opcode fetch, imm16 fetch, mem16 read
                 if (opDest.reg16 == Operand.Reg16.REG_HL) {
                     code = 0x2A; // only HL pair has two choices: either short opcode 0x2A or longer 0xED 0x6B
                 } else if (opDest.reg16 == REG_IX) {
-                    tstates += 4;  // prefix fetch
                     prefix1 = IX_PREFIX;
                     code = 0x2A;
                 } else if (opDest.reg16 == REG_IY) {
-                    tstates += 4;  // prefix fetch
                     prefix1 = IY_PREFIX;
                     code = 0x2A;
                 } else if (opDest.reg16 == REG_BC) {
-                    tstates += 4;  // prefix fetch
                     prefix1 = 0xED;
                     code = 0x4B;
                 } else if (opDest.reg16 == Operand.Reg16.REG_DE) {
-                    tstates += 4;  // prefix fetch
                     prefix1 = 0xED;
                     code = 0x5B;
                 } else if (opDest.reg16 == Operand.Reg16.REG_SP) {
-                    tstates += 4;  // prefix fetch
                     prefix1 = 0xED;
                     code = 0x7B;
                 } else {
@@ -93,11 +79,9 @@ public class LdInstruction extends Instruction {
             } else {
                 throw new RuntimeException();
             }
-        } else if ((opDest.type == Operand.Type.REG8) || (opDest.type == Operand.Type.MEM_PTR_REG)) {
+        } else if ((opDest.type == Operand.Type.REG8) || (opDest.type == Operand.Type.MEM_PTR_REG16)) {
 
-            if ((opSrc.type == Operand.Type.REG8) || (opSrc.type == Operand.Type.MEM_PTR_REG)) {
-
-                tstates = ((opDest.type == Operand.Type.REG8) && (opSrc.type == Operand.Type.REG8)) ? 4 : 7;
+            if ((opSrc.type == Operand.Type.REG8) || (opSrc.type == Operand.Type.MEM_PTR_REG16)) {
 
                 if (opDest.reg8 == Operand.Reg8.REG_B) {
                     code = 0x40;
@@ -110,31 +94,25 @@ public class LdInstruction extends Instruction {
                 } else if (opDest.reg8 == Operand.Reg8.REG_H) {
                     code = 0x60;
                 } else if (opDest.reg8 == Operand.Reg8.REG_IXH) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IX_PREFIX;
                     code = 0x60;
                 } else if (opDest.reg8 == Operand.Reg8.REG_IYH) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IY_PREFIX;
                     code = 0x60;
                 } else if (opDest.reg8 == Operand.Reg8.REG_L) {
                     code = 0x68;
                 } else if (opDest.reg8 == Operand.Reg8.REG_IXL) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IX_PREFIX;
                     code = 0x68;
                 } else if (opDest.reg8 == Operand.Reg8.REG_IYL) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IY_PREFIX;
                     code = 0x68;
                 } else if (opDest.reg16 == Operand.Reg16.REG_HL) {
                     code = 0x70;
                 } else if (opDest.reg16 == REG_IX) {
-                    tstates = tstates + 4 + 5 + 3;  // prefix fetch, index fetch and indexing, mem write
                     prefix1 = IX_PREFIX;
                     code = 0x70;
                 } else if (opDest.reg16 == REG_IY) {
-                    tstates = tstates + 4 + 5 + 3;  // prefix fetch, index fetch and indexing, mem write
                     prefix1 = IY_PREFIX;
                     code = 0x70;
                 } else if (opDest.reg8 == REG_A) {
@@ -149,13 +127,13 @@ public class LdInstruction extends Instruction {
 
 
                 // Special handling for LD (BC),A and LD (DE),A
-                if ((opDest.type == Operand.Type.MEM_PTR_REG) && (opDest.reg16 == REG_BC)) {
+                if ((opDest.type == Operand.Type.MEM_PTR_REG16) && (opDest.reg16 == REG_BC)) {
                     if (opSrc.reg8 != REG_A) {
                         throw new IncorrectOperandException();
                     }
                     // don't need to update a code, it's already correct
 
-                } else if ((opDest.type == Operand.Type.MEM_PTR_REG) && (opDest.reg16 == Operand.Reg16.REG_DE)) {
+                } else if ((opDest.type == Operand.Type.MEM_PTR_REG16) && (opDest.reg16 == Operand.Reg16.REG_DE)) {
                     if (opSrc.reg8 != REG_A) {
                         throw new IncorrectOperandException();
                     }
@@ -165,28 +143,24 @@ public class LdInstruction extends Instruction {
                     if (opSrc.reg8 != REG_A) {
                         throw new IncorrectOperandException();
                     }
-                    tstates += 5;
                     prefix1 = 0xED;
                     code = 0x4F;
                 } else if ((opDest.type == Operand.Type.REG8) && (opDest.reg8 == REG_I)) {
                     if (opSrc.reg8 != REG_A) {
                         throw new IncorrectOperandException();
                     }
-                    tstates += 5;
                     prefix1 = 0xED;
                     code = 0x47;
                 } else if ((opSrc.type == Operand.Type.REG8) && (opSrc.reg8 == Operand.Reg8.REG_R)) {
                     if (opDest.reg8 != REG_A) {
                         throw new IncorrectOperandException();
                     }
-                    tstates += 5;
                     prefix1 = 0xED;
                     code = 0x5F;
                 } else if ((opSrc.type == Operand.Type.REG8) && (opSrc.reg8 == REG_I)) {
                     if (opDest.reg8 != REG_A) {
                         throw new IncorrectOperandException();
                     }
-                    tstates += 5;
                     prefix1 = 0xED;
                     code = 0x57;
 
@@ -209,14 +183,12 @@ public class LdInstruction extends Instruction {
                         if ((opDest.reg8 == Operand.Reg8.REG_H) || (opDest.reg8 == Operand.Reg8.REG_L) || (opDest.reg16 == Operand.Reg16.REG_HL) || (opDest.reg8 == Operand.Reg8.REG_IYH) || (opDest.reg8 == Operand.Reg8.REG_IYL)) {
                             throw new IncorrectOperandException();
                         }
-                        tstates += 4; // prefix fetch
                         prefix1 = IX_PREFIX;
                         code += 0x04;
                     } else if (opSrc.reg8 == Operand.Reg8.REG_IYH) {
                         if ((opDest.reg8 == Operand.Reg8.REG_H) || (opDest.reg8 == Operand.Reg8.REG_L) || (opDest.reg16 == Operand.Reg16.REG_HL) || (opDest.reg8 == Operand.Reg8.REG_IYH) || (opDest.reg8 == Operand.Reg8.REG_IYL)) {
                             throw new IncorrectOperandException();
                         }
-                        tstates += 4; // prefix fetch
                         prefix1 = IY_PREFIX;
                         code += 0x04;
                     } else if (opSrc.reg8 == Operand.Reg8.REG_L) {
@@ -228,39 +200,35 @@ public class LdInstruction extends Instruction {
                         if ((opDest.reg8 == Operand.Reg8.REG_H) || (opDest.reg8 == Operand.Reg8.REG_L) || (opDest.reg16 == Operand.Reg16.REG_HL)  || (opDest.reg8 == Operand.Reg8.REG_IYH) || (opDest.reg8 == Operand.Reg8.REG_IYL)) {
                             throw new IncorrectOperandException();
                         }
-                        tstates += 4; // prefix fetch
                         prefix1 = IX_PREFIX;
                         code += 0x05;
                     } else if (opSrc.reg8 == Operand.Reg8.REG_IYL) {
                         if ((opDest.reg8 == Operand.Reg8.REG_H) || (opDest.reg8 == Operand.Reg8.REG_L) || (opDest.reg16 == Operand.Reg16.REG_HL)  || (opDest.reg8 == Operand.Reg8.REG_IYH) || (opDest.reg8 == Operand.Reg8.REG_IYL)) {
                             throw new IncorrectOperandException();
                         }
-                        tstates += 4; // prefix fetch
                         prefix1 = IY_PREFIX;
                         code += 0x05;
                     } else if (opSrc.reg16 == Operand.Reg16.REG_HL) {
-                        if (opDest.type == Operand.Type.MEM_PTR_REG) {
+                        if (opDest.type == Operand.Type.MEM_PTR_REG16) {
                             throw new IncorrectOperandException();
                         } else if ((opDest.reg8 == Operand.Reg8.REG_IXH) || (opDest.reg8 == Operand.Reg8.REG_IXL) || (opDest.reg8 == Operand.Reg8.REG_IYH) || (opDest.reg8 == Operand.Reg8.REG_IYL)) {
                             throw new IncorrectOperandException();
                         }
                         code += 0x06;
                     } else if (opSrc.reg16 == REG_IX) {
-                        if (opDest.type == Operand.Type.MEM_PTR_REG) {
+                        if (opDest.type == Operand.Type.MEM_PTR_REG16) {
                             throw new IncorrectOperandException();
                         } else if ((opDest.reg8 == Operand.Reg8.REG_IXH) || (opDest.reg8 == Operand.Reg8.REG_IXL) || (opDest.reg8 == Operand.Reg8.REG_IYH) || (opDest.reg8 == Operand.Reg8.REG_IYL)) {
                             throw new IncorrectOperandException();
                         }
-                        tstates += 12;
                         prefix1 = IX_PREFIX;
                         code += 0x06;
                     } else if (opSrc.reg16 == REG_IY) {
-                        if (opDest.type == Operand.Type.MEM_PTR_REG) {
+                        if (opDest.type == Operand.Type.MEM_PTR_REG16) {
                             throw new IncorrectOperandException();
                         } else if ((opDest.reg8 == Operand.Reg8.REG_IXH) || (opDest.reg8 == Operand.Reg8.REG_IXL) || (opDest.reg8 == Operand.Reg8.REG_IYH) || (opDest.reg8 == Operand.Reg8.REG_IYL)) {
                             throw new IncorrectOperandException();
                         }
-                        tstates += 12;
                         prefix1 = IY_PREFIX;
                         code += 0x06;
                     } else if (opSrc.reg8 == REG_A) {
@@ -282,7 +250,6 @@ public class LdInstruction extends Instruction {
                     }
                 }
             } else if (opSrc.type == Operand.Type.IMM8) {
-                tstates = 7;
                 if (opDest.reg8 == Operand.Reg8.REG_B) {
                     code = 0x06;
                 } else if (opDest.reg8 == Operand.Reg8.REG_C) {
@@ -294,32 +261,25 @@ public class LdInstruction extends Instruction {
                 } else if (opDest.reg8 == Operand.Reg8.REG_H) {
                     code = 0x26;
                 } else if (opDest.reg8 == Operand.Reg8.REG_IXH) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IX_PREFIX;
                     code = 0x26;
                 } else if (opDest.reg8 == Operand.Reg8.REG_IYH) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IY_PREFIX;
                     code = 0x26;
                 } else if (opDest.reg8 == Operand.Reg8.REG_L) {
                     code = 0x2E;
                 } else if (opDest.reg8 == Operand.Reg8.REG_IXL) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IX_PREFIX;
                     code = 0x2E;
                 } else if (opDest.reg8 == Operand.Reg8.REG_IYL) {
-                    tstates += 4; // prefix fetch
                     prefix1 = IY_PREFIX;
                     code = 0x2E;
                 } else if (opDest.reg16 == Operand.Reg16.REG_HL) {
-                    tstates += 3;
                     code = 0x36;
                 } else if (opDest.reg16 == REG_IX) {
-                    tstates = tstates + 3 + 4 + 5; // imm8 fetch, prefix fetch, index fetch and indexing
                     prefix1 = IX_PREFIX;
                     code = 0x36;
                 } else if (opDest.reg16 == REG_IY) {
-                    tstates = tstates + 3 + 4 + 5; // imm8 fetch, prefix fetch, index fetch and indexing
                     prefix1 = IY_PREFIX;
                     code = 0x36;
                 } else if (opDest.reg8 == REG_A) {
@@ -329,7 +289,6 @@ public class LdInstruction extends Instruction {
                 }
             } else if (opSrc.type == Operand.Type.MEM_PTR_IMM16) {
                 if ((opDest.type == Operand.Type.REG8) && (opDest.reg8 == REG_A)) {
-                    tstates = 4 + 6 + 3; // opcode fetch, imm16 fetch, reg8 read
                     code = 0x3A;
                 } else {
                     throw new IncorrectOperandException();
@@ -339,29 +298,23 @@ public class LdInstruction extends Instruction {
             }
         } else if (opDest.type == Operand.Type.MEM_PTR_IMM16) {
             if ((opSrc.type == Operand.Type.REG8) && (opSrc.reg8 == REG_A)) {
-                tstates = 4 + 6 + 3; // opcode fetch, imm16 fetch, reg8 write
                 code = 0x32;
             } else if ((opSrc.type == Operand.Type.REG16) && (opSrc.reg16 == Operand.Reg16.REG_HL)) {
-                tstates = 4 + 6 + 6; // opcode fetch, imm16 fetch, reg16 write
+                // LD (NN),HL
                 code = 0x22; // only HL pair has two choices: either short opcode 0x22 or longer 0xED 0x63
             } else if ((opSrc.type == Operand.Type.REG16) && (opSrc.reg16 == REG_IX)) {
-                tstates = 4 + 4 + 6 + 6; // prefix fetch, opcode fetch, imm16 fetch, reg16 write
                 prefix1 = IX_PREFIX;
                 code = 0x22;
             } else if ((opSrc.type == Operand.Type.REG16) && (opSrc.reg16 == REG_IY)) {
-                tstates = 4 + 4 + 6 + 6; // prefix fetch, opcode fetch, imm16 fetch, reg16 write
                 prefix1 = IY_PREFIX;
                 code = 0x22;
             } else if ((opSrc.type == Operand.Type.REG16) && (opSrc.reg16 == REG_BC)) {
-                tstates = 4 + 4 + 6 + 6; // prefix fetch, opcode fetch, imm16 fetch, reg16 write
                 prefix1 = 0xED;
                 code = 0x43;
             } else if ((opSrc.type == Operand.Type.REG16) && (opSrc.reg16 == Operand.Reg16.REG_DE)) {
-                tstates = 4 + 4 + 6 + 6; // prefix fetch, opcode fetch, imm16 fetch, reg16 write
                 prefix1 = 0xED;
                 code = 0x53;
             } else if ((opSrc.type == Operand.Type.REG16) && (opSrc.reg16 == Operand.Reg16.REG_SP)) {
-                tstates = 4 + 4 + 6 + 6; // prefix fetch, opcode fetch, imm16 fetch, reg16 write
                 prefix1 = 0xED;
                 code = 0x73;
             } else {
@@ -373,13 +326,11 @@ public class LdInstruction extends Instruction {
         }
         this.opCode = code;
         this.prefix1 = prefix1;
-        this.tstates = tstates;
     }
 
     public static LdInstruction decodeInitial(int code, int prefix1) {
         prefix1 = prefix1;
         code = code & 0xFF;
-        int tstates;
 
         if ((prefix1 == -1) || (prefix1 == IX_PREFIX) || (prefix1 == IY_PREFIX)) {
             if ((code >= 0x40) && (code <= 0x7F)) {
@@ -394,7 +345,6 @@ public class LdInstruction extends Instruction {
                 int dst = code & 0x78;
 
                 Operand opDest, opSrc;
-                tstates = 4; // base value for reg-reg transfer
                 if (dst == 0x40) {
                     opDest = Operand.reg8(Operand.Reg8.REG_B);
                 } else if (dst == 0x48) {
@@ -408,12 +358,10 @@ public class LdInstruction extends Instruction {
                         checkedPrefix = prefix1;
                         // in this case prefix is related to opSrc
                         opDest = Operand.reg8(Operand.Reg8.REG_IXH);
-                        tstates += 4; // prefix fetching
                     } else if ((prefix1 == IY_PREFIX) && (src != 0x06)) {
                         checkedPrefix = prefix1;
                         // in this case prefix is related to opSrc
                         opDest = Operand.reg8(Operand.Reg8.REG_IYH);
-                        tstates += 4; // prefix fetching
                     } else {
                         opDest = Operand.reg8(Operand.Reg8.REG_H);
                     }
@@ -422,24 +370,19 @@ public class LdInstruction extends Instruction {
                         checkedPrefix = prefix1;
                         // in this case prefix is related to opSrc
                         opDest = Operand.reg8(Operand.Reg8.REG_IXL);
-                        tstates += 4; // prefix fetching
                     } else if ((prefix1 == IY_PREFIX) && (src != 0x06)) {
                         checkedPrefix = prefix1;
                         opDest = Operand.reg8(Operand.Reg8.REG_IYL);
-                        tstates += 4; // prefix fetching
                     } else {
                         opDest = Operand.reg8(Operand.Reg8.REG_L);
                     }
                 } else if (dst == 0x70) {
-                    tstates = 7;
                     if (prefix1 == IX_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.memRegPtrIndex(REG_IX, 0);
-                        tstates = tstates + 4 + 4 + 4; // prefix fetching, index fetching, indexing
                     } else if (prefix1 == IY_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.memRegPtrIndex(REG_IY, 0);
-                        tstates = tstates + 4 + 4 + 4; // prefix fetching, index fetching, indexing
                     } else {
                         opDest = Operand.memRegPtr(Operand.Reg16.REG_HL);
                     }
@@ -461,11 +404,9 @@ public class LdInstruction extends Instruction {
                     if ((prefix1 == IX_PREFIX) && (dst != 0x70)) {
                         checkedPrefix = prefix1;
                         opSrc =  Operand.reg8(Operand.Reg8.REG_IXH);
-                        tstates += 4; // prefix fetching
                     } else if ((prefix1 == IY_PREFIX) && (dst != 0x70)) {
                         checkedPrefix = prefix1;
                         opSrc = Operand.reg8(Operand.Reg8.REG_IYH);
-                        tstates += 4; // prefix fetching
                     } else {
                         opSrc = Operand.reg8(Operand.Reg8.REG_H);
                     }
@@ -473,24 +414,19 @@ public class LdInstruction extends Instruction {
                     if ((prefix1 == IX_PREFIX) && (dst != 0x70)) {
                         checkedPrefix = prefix1;
                         opSrc = Operand.reg8(Operand.Reg8.REG_IXL);
-                        tstates += 4; // prefix fetching
                     } else if ((prefix1 == IY_PREFIX) && (dst != 0x70)) {
                         checkedPrefix = prefix1;
                         opSrc = Operand.reg8(Operand.Reg8.REG_IYL);
-                        tstates += 4; // prefix fetching
                     } else {
                         opSrc = Operand.reg8(Operand.Reg8.REG_L);
                     }
                 } else if (src == 0x06) {
-                    tstates = 7;
                     if (prefix1 == IX_PREFIX) {
                         checkedPrefix = prefix1;
                         opSrc = Operand.memRegPtrIndex(REG_IX, 0);
-                        tstates = tstates + 4 + 4 + 4; // prefix fetching, index fetching, indexing
                     } else if (prefix1 == IY_PREFIX) {
                         checkedPrefix = prefix1;
                         opSrc = Operand.memRegPtrIndex(REG_IY, 0);
-                        tstates = tstates + 4 + 4 + 4; // prefix fetching, index fetching, indexing
                     } else {
                         opSrc = Operand.memRegPtr(Operand.Reg16.REG_HL);
                     }
@@ -504,11 +440,10 @@ public class LdInstruction extends Instruction {
                     return null;
                 }
 
-                return new LdInstruction(code, prefix1, opDest, opSrc, false, tstates);
+                return new LdInstruction(code, prefix1, opDest, opSrc, false);
             } else if ((code >= 0) && (code <= 0x3F) && ((code & 0x07) == 0x06)) {
                 int checkedPrefix = -1;
                 Operand opDest;
-                tstates = 7;
                 if (code == 0x06) {
                     opDest = Operand.reg8(Operand.Reg8.REG_B);
                 } else if (code == 0x0E) {
@@ -521,11 +456,9 @@ public class LdInstruction extends Instruction {
                     if (prefix1 == IX_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.reg8(Operand.Reg8.REG_IXH);
-                        tstates += 4; // prefix fetching
                     } else if (prefix1 == IY_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.reg8(Operand.Reg8.REG_IYH);
-                        tstates += 4; // prefix fetching
                     } else {
                         opDest = Operand.reg8(Operand.Reg8.REG_H);
                     }
@@ -533,24 +466,19 @@ public class LdInstruction extends Instruction {
                     if (prefix1 == IX_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.reg8(Operand.Reg8.REG_IXL);
-                        tstates += 4; // prefix fetching
                     } else if (prefix1 == IY_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.reg8(Operand.Reg8.REG_IYL);
-                        tstates += 4; // prefix fetching
                     } else {
                         opDest = Operand.reg8(Operand.Reg8.REG_L);
                     }
                 } else if (code == 0x36) {
-                    tstates = 10;
                     if (prefix1 == IX_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.memRegPtrIndex(REG_IX, 0);
-                        tstates = tstates + 4 + 5; // prefix fetching, index fetching, indexing
                     } else if (prefix1 == IY_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.memRegPtrIndex(REG_IY, 0);
-                        tstates = tstates + 4 + 5; // prefix fetching, index fetching, indexing
                     } else {
                         opDest = Operand.memRegPtr(Operand.Reg16.REG_HL);
                     }
@@ -564,58 +492,48 @@ public class LdInstruction extends Instruction {
                     return null;
                 }
 
-                return new LdInstruction(code, prefix1, opDest, Operand.imm8(0), true, tstates);
+                return new LdInstruction(code, prefix1, opDest, Operand.imm8(0), true);
 
             } else if ((code >= 0) && (code <= 0x3F) && ((code & 0x07) == 0x02)) {
                 int checkedPrefix = -1;
                 Operand opDest, opSrc;
                 boolean partial;
                 if (code == 0x02) {
-                    tstates = 7;
                     opDest = Operand.memRegPtr(REG_BC);
                     opSrc = Operand.reg8(REG_A);
                     partial = false;
                 } else if (code == 0x0A) {
-                    tstates = 7;
                     opSrc = Operand.memRegPtr(REG_BC);
                     opDest = Operand.reg8(REG_A);
                     partial = false;
                 } else if (code == 0x12) {
-                    tstates = 7;
                     opDest = Operand.memRegPtr(Operand.Reg16.REG_DE);
                     opSrc = Operand.reg8(REG_A);
                     partial = false;
                 } else if (code == 0x1A) {
-                    tstates = 7;
                     opSrc = Operand.memRegPtr(Operand.Reg16.REG_DE);
                     opDest = Operand.reg8(REG_A);
                     partial = false;
                 } else if (code == 0x22) {
                     opDest = Operand.memImmPtr(0);
-                    tstates = 4 + 6 + 6; // opcode fetch, imm16 fetch, reg16 write
                     if (prefix1 == IX_PREFIX) {
                         checkedPrefix = prefix1;
                         opSrc = Operand.reg16(REG_IX);
-                        tstates += 4; // prefix fetch
                     } else if (prefix1 == IY_PREFIX) {
                         checkedPrefix = prefix1;
                         opSrc = Operand.reg16(REG_IY);
-                        tstates += 4; // prefix fetch
                     } else {
                         opSrc = Operand.reg16(Operand.Reg16.REG_HL);
                     }
                     partial = true;
                 } else if (code == 0x2A) {
                     opSrc = Operand.memImmPtr(0);
-                    tstates = 4 + 6 + 6; // opcode fetch, imm16 fetch, reg16 read
                     if (prefix1 == IX_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.reg16(REG_IX);
-                        tstates += 4; // prefix fetch
                     } else if (prefix1 == IY_PREFIX) {
                         checkedPrefix = prefix1;
                         opDest = Operand.reg16(REG_IY);
-                        tstates += 4; // prefix fetch
                     } else {
                         opDest = Operand.reg16(Operand.Reg16.REG_HL);
                     }
@@ -624,84 +542,72 @@ public class LdInstruction extends Instruction {
                     opDest = Operand.memImmPtr(0);
                     opSrc = Operand.reg8(REG_A);
                     partial = true;
-                    tstates = 4 + 6 + 3; // opcode fetch, imm16 fetch, reg8 write
                 } else if (code == 0x3A) {
                     opSrc = Operand.memImmPtr(0);
                     opDest = Operand.reg8(REG_A);
                     partial = true;
-                    tstates = 4 + 6 + 3; // opcode fetch, imm16 fetch, reg8 read
                 } else {
                     throw new RuntimeException();
                 }
                 if (checkedPrefix != prefix1) {
                     return null;
                 }
-                return new LdInstruction(code, prefix1, opDest, opSrc, partial, tstates);
+                return new LdInstruction(code, prefix1, opDest, opSrc, partial);
             } else if ((prefix1 == -1) && (code == 0x01)) {
-                tstates = 10;
-                return new LdInstruction(code, prefix1, Operand.reg16(REG_BC), Operand.imm16(0), true, tstates);
+                return new LdInstruction(code, prefix1, Operand.reg16(REG_BC), Operand.imm16(0), true);
             } else if ((prefix1 == -1) && (code == 0x11)) {
-                tstates = 10;
-                return new LdInstruction(code, prefix1, Operand.reg16(Operand.Reg16.REG_DE), Operand.imm16(0), true, tstates);
+                return new LdInstruction(code, prefix1, Operand.reg16(Operand.Reg16.REG_DE), Operand.imm16(0), true);
             } else if (code == 0x21) {
-                tstates = 10;
                 Operand opDest;
                 if (prefix1 == IX_PREFIX) {
                     opDest = Operand.reg16(REG_IX);
-                    tstates += 4; // prefix fetch
                 } else if (prefix1 == IY_PREFIX) {
                     opDest = Operand.reg16(REG_IY);
-                    tstates += 4; // prefix fetch
                 } else {
                     opDest = Operand.reg16(Operand.Reg16.REG_HL);
                 }
-                return new LdInstruction(code, prefix1, opDest, Operand.imm16(0), true, tstates);
+                return new LdInstruction(code, prefix1, opDest, Operand.imm16(0), true);
             } else if ((prefix1 == -1) && (code == 0x31)) {
-                tstates = 10;
-                return new LdInstruction(code, prefix1, Operand.reg16(Operand.Reg16.REG_SP), Operand.imm16(0), true, tstates);
+                return new LdInstruction(code, prefix1, Operand.reg16(Operand.Reg16.REG_SP), Operand.imm16(0), true);
             } else if (code == 0xF9) {
-                tstates = 6; // opcode fetch, reg16 transfer
                 Operand opSrc;
                 if (prefix1 == IX_PREFIX) {
                     opSrc = Operand.reg16(REG_IX);
-                    tstates += 4; // prefix fetch
                 } else if (prefix1 == IY_PREFIX) {
                     opSrc = Operand.reg16(REG_IY);
-                    tstates += 4; // prefix fetch
                 } else {
                     opSrc = Operand.reg16(Operand.Reg16.REG_HL);
                 }
-                return new LdInstruction(code, prefix1, Operand.reg16(Operand.Reg16.REG_SP), opSrc, false, tstates);
+                return new LdInstruction(code, prefix1, Operand.reg16(Operand.Reg16.REG_SP), opSrc, false);
             } else {
                 return null;
             }
         } else if (prefix1 == 0xED) {
             if (code == 0x47) {
-                return new LdInstruction(code, prefix1, Operand.reg8(Operand.Reg8.REG_I), Operand.reg8(Operand.Reg8.REG_A), false, 9);
+                return new LdInstruction(code, prefix1, Operand.reg8(Operand.Reg8.REG_I), Operand.reg8(Operand.Reg8.REG_A), false);
             } else if (code == 0x4F) {
-                return new LdInstruction(code, prefix1, Operand.reg8(Operand.Reg8.REG_R), Operand.reg8(Operand.Reg8.REG_A), false, 9);
+                return new LdInstruction(code, prefix1, Operand.reg8(Operand.Reg8.REG_R), Operand.reg8(Operand.Reg8.REG_A), false);
             } else if (code == 0x57) {
-                return new LdInstruction(code, prefix1, Operand.reg8(Operand.Reg8.REG_A), Operand.reg8(Operand.Reg8.REG_I), false, 9);
+                return new LdInstruction(code, prefix1, Operand.reg8(Operand.Reg8.REG_A), Operand.reg8(Operand.Reg8.REG_I), false);
             } else if (code == 0x5F) {
-                return new LdInstruction(code, prefix1, Operand.reg8(Operand.Reg8.REG_A), Operand.reg8(Operand.Reg8.REG_R), false, 9);
+                return new LdInstruction(code, prefix1, Operand.reg8(Operand.Reg8.REG_A), Operand.reg8(Operand.Reg8.REG_R), false);
             } else {
-                tstates = 4 + 4 + 6 + 6; // prefix fetch, opcode fetch, imm16 fetch, reg16 read or write
                 if (code == 0x43) {
-                    return new LdInstruction(code, prefix1, Operand.memImmPtr(0), Operand.reg16(REG_BC), false, tstates);
+                    return new LdInstruction(code, prefix1, Operand.memImmPtr(0), Operand.reg16(REG_BC), false);
                 } else if (code == 0x53) {
-                    return new LdInstruction(code, prefix1, Operand.memImmPtr(0), Operand.reg16(REG_DE), false, tstates);
+                    return new LdInstruction(code, prefix1, Operand.memImmPtr(0), Operand.reg16(REG_DE), false);
                 } else if (code == 0x63) {
-                    return new LdInstruction(code, prefix1, Operand.memImmPtr(0), Operand.reg16(REG_HL), false, tstates);
+                    return new LdInstruction(code, prefix1, Operand.memImmPtr(0), Operand.reg16(REG_HL), false);
                 } else if (code == 0x73) {
-                    return new LdInstruction(code, prefix1, Operand.memImmPtr(0), Operand.reg16(REG_SP), false, tstates);
+                    return new LdInstruction(code, prefix1, Operand.memImmPtr(0), Operand.reg16(REG_SP), false);
                 } else if (code == 0x4B) {
-                    return new LdInstruction(code, prefix1, Operand.reg16(REG_BC), Operand.memImmPtr(0), false, tstates);
+                    return new LdInstruction(code, prefix1, Operand.reg16(REG_BC), Operand.memImmPtr(0), false);
                 } else if (code == 0x5B) {
-                    return new LdInstruction(code, prefix1, Operand.reg16(REG_DE), Operand.memImmPtr(0), false, tstates);
+                    return new LdInstruction(code, prefix1, Operand.reg16(REG_DE), Operand.memImmPtr(0), false);
                 } else if (code == 0x6B) {
-                    return new LdInstruction(code, prefix1, Operand.reg16(REG_HL), Operand.memImmPtr(0), false, tstates);
+                    return new LdInstruction(code, prefix1, Operand.reg16(REG_HL), Operand.memImmPtr(0), false);
                 } else if (code == 0x7B) {
-                    return new LdInstruction(code, prefix1, Operand.reg16(REG_SP), Operand.memImmPtr(0), false, tstates);
+                    return new LdInstruction(code, prefix1, Operand.reg16(REG_SP), Operand.memImmPtr(0), false);
                 } else {
                     return null;
                 }
@@ -718,13 +624,13 @@ public class LdInstruction extends Instruction {
             opSrc.imm = decodeImm16(data, offset);
             offset += 2;
         } else if (opSrc.type == Operand.Type.IMM8) {
-            if (opDest.type == Operand.Type.MEM_PTR_REG && (opDest.reg16 == REG_IX) || (opDest.reg16 == REG_IY)) {
+            if (opDest.type == Operand.Type.MEM_PTR_REG16 && (opDest.reg16 == REG_IX) || (opDest.reg16 == REG_IY)) {
                 opDest.indexOffset = data[offset];
                 offset++;
             }
             opSrc.imm = (data[offset] & 0xFF);
             offset++;
-        } else if (opSrc.type == Operand.Type.MEM_PTR_REG) {
+        } else if (opSrc.type == Operand.Type.MEM_PTR_REG16) {
             if ((opSrc.reg16 == REG_IX) || (opSrc.reg16 == REG_IY)) {
                 opSrc.indexOffset = data[offset];
                 offset++;
@@ -733,7 +639,7 @@ public class LdInstruction extends Instruction {
             if (opDest.type == Operand.Type.MEM_PTR_IMM16) {
                 opDest.imm = decodeImm16(data, offset);
                 offset += 2;
-            } else if (opDest.type == Operand.Type.MEM_PTR_REG) {
+            } else if (opDest.type == Operand.Type.MEM_PTR_REG16) {
                 if ((opDest.reg16 == REG_IX) || (opDest.reg16 == REG_IY)) {
                     opDest.indexOffset = data[offset];
                     offset++;
@@ -751,7 +657,7 @@ public class LdInstruction extends Instruction {
         } else if (opSrc.type == Operand.Type.IMM8) {
             dest[offset] = (byte)(opSrc.imm & 0xFF);
             offset++;
-        } else if (opSrc.type == Operand.Type.MEM_PTR_REG) {
+        } else if (opSrc.type == Operand.Type.MEM_PTR_REG16) {
             if ((opSrc.reg16 == REG_IX) || (opSrc.reg16 == REG_IY)) {
                 dest[offset] = (byte) opSrc.indexOffset;
                 offset++;
@@ -759,7 +665,7 @@ public class LdInstruction extends Instruction {
         } else if ((opSrc.type == Operand.Type.REG8) || (opSrc.type == Operand.Type.REG16)) {
             if (opDest.type == Operand.Type.MEM_PTR_IMM16) {
                 offset = encodeImm16(dest, offset, opDest.imm);
-            } else if (opDest.type == Operand.Type.MEM_PTR_REG) {
+            } else if (opDest.type == Operand.Type.MEM_PTR_REG16) {
                 if ((opDest.reg16 == REG_IX) || (opDest.reg16 == REG_IY)) {
                     dest[offset] = (byte) opSrc.indexOffset;
                     offset++;

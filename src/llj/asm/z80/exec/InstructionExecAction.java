@@ -12,6 +12,12 @@ import static llj.asm.z80.Instruction.Operand.Reg16.REG_SP;
 public abstract class InstructionExecAction {
 
     public enum ExecOperand8 {
+
+        // Most of the instructions operate on 1-byte values, either stored in registers or obtained from memory
+        // Other instructions operate on 2-byte values, but such operations are split into 1-byte micro-operations
+        // Instructions like LD SP,HL mean that low and high bytes of SP are accessable separately
+        // Instructions such as CALL/RET will push/pop PC on/from stack, and since memory is byte-addressable, we allow accessing high and low bytes of PC
+        // There are 2 operand latches in Z80 ALU, but we will not distinguish them here, and will simply use DLATCH
         REG_A, REG_B, REG_C, REG_D, REG_E, REG_H, REG_L, REG_IXH, REG_IXL, REG_IYH, REG_IYL, WZH, WZL, PCL, PCH, REG_SPL, REG_SPH, DLATCH, FLAGS, REG_I, REG_R;
 
         public static ExecOperand8 forReg(Instruction.Operand.Reg8 reg) {
@@ -78,7 +84,7 @@ public abstract class InstructionExecAction {
 
         // part 1:
         // read offset byte, if needed
-        if ((instr.opSrc.type == Instruction.Operand.Type.MEM_PTR_REG && instr.opSrc.hasIndexOffset) || (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_REG && instr.opDest.hasIndexOffset) ) {
+        if ((instr.opSrc.type == Instruction.Operand.Type.MEM_PTR_REG16 && instr.opSrc.hasIndexOffset) || (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_REG16 && instr.opDest.hasIndexOffset) ) {
             result.add(MemGet.withIncrement(ExecOperand16.PC, ExecOperand8.DLATCH));
         }
         // let's check if any operand is IMM so we need to read those IMM values from memory
@@ -87,7 +93,7 @@ public abstract class InstructionExecAction {
             if (instr.opDest.type == Instruction.Operand.Type.REG8) {
                 // LD A,N
                 dest = ExecOperand8.forReg(instr.opDest.reg8);
-            } else if (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_REG) {
+            } else if (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_REG16) {
                 // LD (HL),N
                 dest = ExecOperand8.DLATCH;
                 if (instr.opDest.hasIndexOffset) special = true;
@@ -122,7 +128,7 @@ public abstract class InstructionExecAction {
                 if ((instr.opSrc.reg8 == Instruction.Operand.Reg8.REG_R) || (instr.opSrc.reg8 == Instruction.Operand.Reg8.REG_I) || (instr.opDest.reg8 == Instruction.Operand.Reg8.REG_R) || (instr.opDest.reg8 == Instruction.Operand.Reg8.REG_I)) {
                     result.add(new GenericAction(1));
                 }
-            } else if (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_REG ){
+            } else if (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_REG16){
                 // LD (HL),A
                 // this will be handled in part 3
             } else if (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_IMM16 ){
@@ -141,7 +147,7 @@ public abstract class InstructionExecAction {
             } else {
                 throw new RuntimeException();
             }
-        } else if (instr.opSrc.type == Instruction.Operand.Type.MEM_PTR_REG) {
+        } else if (instr.opSrc.type == Instruction.Operand.Type.MEM_PTR_REG16) {
             // LD A,(HL)
             // LD A,(IX+d)
             ExecOperand16 addr = ExecOperand16.forReg(instr.opSrc.reg16);
@@ -185,7 +191,7 @@ public abstract class InstructionExecAction {
         }
 
         // part 3
-        if (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_REG) {
+        if (instr.opDest.type == Instruction.Operand.Type.MEM_PTR_REG16) {
             // LD (HL),A
             // LD (HL),N
             ExecOperand16 dest = ExecOperand16.forReg(instr.opDest.reg16);
@@ -248,7 +254,7 @@ public abstract class InstructionExecAction {
         } else if (instr.opSrc.type == Instruction.Operand.Type.REG8) {
             // ADD A,B
             src = ExecOperand8.forReg(instr.opSrc.reg8);
-        } else if ((instr.opSrc.type == Instruction.Operand.Type.MEM_PTR_REG)) {
+        } else if ((instr.opSrc.type == Instruction.Operand.Type.MEM_PTR_REG16)) {
             // ADD A,(HL)
             // ADD A,(IX+d)
             ExecOperand16 addr = ExecOperand16.forReg(instr.opSrc.reg16);
@@ -282,7 +288,7 @@ public abstract class InstructionExecAction {
         List<InstructionExecAction> result = new ArrayList<>(4);
 
         // part 1
-        if ((instr.op.type == Instruction.Operand.Type.MEM_PTR_REG && instr.op.hasIndexOffset)) {
+        if ((instr.op.type == Instruction.Operand.Type.MEM_PTR_REG16 && instr.op.hasIndexOffset)) {
             result.add(MemGet.withIncrement(ExecOperand16.PC, ExecOperand8.DLATCH));
         }
 
@@ -291,7 +297,7 @@ public abstract class InstructionExecAction {
         if (instr.op.type == Instruction.Operand.Type.REG8) {
             // INC A
             result.add(new IncDec8(instr.operation, ExecOperand8.forReg(instr.op.reg8), true)); // since destination is register, so it is overlapped with fetch of next instr
-        } else if (instr.op.type == Instruction.Operand.Type.MEM_PTR_REG) {
+        } else if (instr.op.type == Instruction.Operand.Type.MEM_PTR_REG16) {
             // INC (HL)
             // INC (IX+d)
             ExecOperand16 addr = ExecOperand16.forReg(instr.op.reg16);
@@ -439,7 +445,7 @@ public abstract class InstructionExecAction {
 
         if (instr.op.type == Instruction.Operand.Type.REG8) {
             result.add(new ShiftRot8(ExecOperand8.forReg(instr.op.reg8), instr.type));
-        } else if (instr.op.type == Instruction.Operand.Type.MEM_PTR_REG) {
+        } else if (instr.op.type == Instruction.Operand.Type.MEM_PTR_REG16) {
             ExecOperand16 addr = ExecOperand16.forReg(instr.op.reg16);
             if (instr.op.hasIndexOffset) {
                 // add offset to mem ptr reg
@@ -470,7 +476,7 @@ public abstract class InstructionExecAction {
 
         if (instr.op.type == Instruction.Operand.Type.REG8) {
             result.add(new Bits8(instr.type, instr.bitIndex, ExecOperand8.forReg(instr.op.reg8)));
-        } else if (instr.op.type == Instruction.Operand.Type.MEM_PTR_REG) {
+        } else if (instr.op.type == Instruction.Operand.Type.MEM_PTR_REG16) {
             ExecOperand16 addr = ExecOperand16.forReg(instr.op.reg16);
             if (instr.op.hasIndexOffset) {
                 // add offset to mem ptr reg
@@ -533,7 +539,7 @@ public abstract class InstructionExecAction {
         if ((instr.op1.type == Instruction.Operand.Type.REG16) && (instr.op1.reg16 == Instruction.Operand.Reg16.REG_DE)) {
             // EX DE,HL
             return Collections.singletonList(new ExDEHL());
-        } else if ((instr.op1.type == Instruction.Operand.Type.MEM_PTR_REG) && (instr.op1.reg16 == REG_SP)) {
+        } else if ((instr.op1.type == Instruction.Operand.Type.MEM_PTR_REG16) && (instr.op1.reg16 == REG_SP)) {
             // EX (SP),HL
             List<InstructionExecAction> result = new ArrayList<>(4);
             result.addAll(Arrays.asList(pop(ExecOperand8.WZL, ExecOperand8.WZH)));
@@ -673,6 +679,7 @@ public abstract class InstructionExecAction {
 
         public final ExecOperand16 addr;
         public final ExecOperand8 dest;
+        // these flags affect how increment/decrement circuit of Z80 will affect address
         public final boolean postIncrementAddr, postDecrementAddr;
         public final boolean overlapped;
 
@@ -714,6 +721,7 @@ public abstract class InstructionExecAction {
 
         public final ExecOperand16 addr;
         public final ExecOperand8 dest;
+        // these flags affect how increment/decrement circuit of Z80 will affect address
         public final boolean postIncrementAddr, postDecrementAddr, preDecrementAddr;
 
         public MemSet(ExecOperand16 addr, ExecOperand8 dest) {
@@ -783,6 +791,7 @@ public abstract class InstructionExecAction {
     }
 
     public static class Op8 extends InstructionExecAction {
+        // This represents operation done by 1-byte ALU of Z80
 
         public final ExecOperand8 opDest, opSrc;
         public final Op2Instruction.Operation operation;
@@ -800,6 +809,7 @@ public abstract class InstructionExecAction {
     }
 
     public static class IncDec8 extends InstructionExecAction {
+        // This represents operation done by 1-byte ALU of Z80
 
         public final ExecOperand8 operand;
         public final IncDecInstruction.Operation operation;
@@ -834,6 +844,9 @@ public abstract class InstructionExecAction {
     }
 
     public static class IncDec16 extends InstructionExecAction {
+        // This represents operation done by 2-byte increment/decrement circuit of Z80
+        // However, not all usages of inc/dec are described by this op, only those which have their result stored somewhere
+        // Other usages are covered by auto-inc-dec flags of memget/memset
 
         public final ExecOperand16 operand;
         public final IncDecInstruction.Operation operation;

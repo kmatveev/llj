@@ -2,6 +2,9 @@ package llj.asm.z80;
 
 public abstract class Instruction {
 
+    // This class and its subclasses represent syntaxic/semantic/declarative aspects of Z80 instructions, as opposed to execution aspects.
+    // This includes encoding/decoding, info about operands and their types
+
     public int opCode, prefix1 = -1, prefix2 = -1;
 
     public final static int BITS_PREFIX = 0xCB, EXT_PREFIX = 0xED, IX_PREFIX = 0xDD, IY_PREFIX = 0xFD;
@@ -30,7 +33,11 @@ public abstract class Instruction {
 
     public static class Operand {
 
-        public static enum Type { REG8, REG16, IMM8, IMM16, MEM_PTR_REG, MEM_PTR_IMM16, PORT_NUM_IMM8, PORT_NUM_REG }
+        // I've tried to assign "type of value" to operand types to specify if value obtained from operand is either 1 or 2 bytes
+        // However, it doesn't work.
+        // There are cases like LD (NN),HL and LD (NN),A so MEM_PTR_IMM16 may store either 1 or 2 bytes depending on another operand
+
+        public static enum Type { REG8, REG16, IMM8, IMM16, MEM_PTR_REG16, MEM_PTR_IMM16, PORT_NUM_IMM8, PORT_NUM_REG }
 
         public static enum Reg8 {
             REG_A, REG_B, REG_C, REG_D, REG_E, REG_H, REG_L, REG_I, REG_R, REG_IXH, REG_IXL, REG_IYH, REG_IYL;
@@ -110,11 +117,11 @@ public abstract class Instruction {
         }
 
         public static Operand memRegPtr(Reg16 reg16) {
-            return new Operand(Type.MEM_PTR_REG, null, reg16, 0, 0);
+            return new Operand(Type.MEM_PTR_REG16, null, reg16, 0, 0);
         }
 
         public static Operand memRegPtrIndex(Reg16 reg16, int offset) {
-            Operand result = new Operand(Type.MEM_PTR_REG, null, reg16, 0, offset);
+            Operand result = new Operand(Type.MEM_PTR_REG16, null, reg16, 0, offset);
             result.hasIndexOffset = true;
             return result;
         }

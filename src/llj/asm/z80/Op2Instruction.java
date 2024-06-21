@@ -30,7 +30,7 @@ public class Op2Instruction extends Instruction {
     public void getCode(Operation operation, Instruction.Operand opDest, Instruction.Operand opSrc) throws IncorrectOperandException {
         int code;
         int prefix1 = -1;
-        if ((opDest.type == Operand.Type.REG8) && ((opSrc.type == Operand.Type.REG8) || (opSrc.type == Operand.Type.MEM_PTR_REG))) {
+        if ((opDest.type == Operand.Type.REG8) && ((opSrc.type == Operand.Type.REG8) || (opSrc.type == Operand.Type.MEM_PTR_REG16))) {
             if ( opDest.reg8 != Operand.Reg8.REG_A) {
                 throw new IncorrectOperandException();
             }
@@ -331,7 +331,7 @@ public class Op2Instruction extends Instruction {
         if (opSrc.type == Operand.Type.IMM8) {
             opSrc.imm = data[offset] & 0xFF;
             offset++;
-        } else if (opSrc.type == Operand.Type.MEM_PTR_REG) {
+        } else if (opSrc.type == Operand.Type.MEM_PTR_REG16) {
             if ((opSrc.reg16 == REG_IX) || (opSrc.reg16 == REG_IY)) {
                 opSrc.indexOffset = data[offset];
                 offset++;
@@ -346,7 +346,7 @@ public class Op2Instruction extends Instruction {
         if (opSrc.type == Operand.Type.IMM8) {
             dest[offset] = (byte)(opSrc.imm & 0xFF);
             offset++;
-        } else if (opSrc.type == Operand.Type.MEM_PTR_REG) {
+        } else if (opSrc.type == Operand.Type.MEM_PTR_REG16) {
             if ((opSrc.reg16 == REG_IX) || (opSrc.reg16 == REG_IY)) {
                 dest[offset] = (byte) opSrc.indexOffset;
                 offset++;

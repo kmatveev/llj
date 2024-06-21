@@ -365,7 +365,7 @@ public class VisualPE {
         IdentityHashMap<TreeNode, Section> sectionHeaderNodes;
         DefaultMutableTreeNode sectionsNode;
         IdentityHashMap<TreeNode, Section> sectionNodes;
-        DefaultMutableTreeNode exportsNode, importsNode, resourcesRootNode, exceptionsNode;
+        DefaultMutableTreeNode exportsNode, importsNode, resourcesRootNode, exceptionsNode, delayImportsNode;
         DefaultMutableTreeNode coffSymbolsNode;
         DefaultMutableTreeNode coffStringsNode;
 
@@ -427,6 +427,17 @@ public class VisualPE {
                     DefaultMutableTreeNode importBlockNode = new DefaultMutableTreeNode(importBlock.name);
                     importBlockNodes.put(importBlockNode, importBlock);
                     importsNode.add(importBlockNode);
+                }
+            }
+
+            delayImportsNode = new DefaultMutableTreeNode("Delay Imports");
+            peNode.add(delayImportsNode);
+            IdentityHashMap<DefaultMutableTreeNode, ImportBlock> delayImportBlockNodes = new IdentityHashMap<>();
+            if (peFormat.delayImports != null) {
+                for (ImportBlock importBlock : peFormat.delayImports) {
+                    DefaultMutableTreeNode importBlockNode = new DefaultMutableTreeNode(importBlock.name);
+                    delayImportBlockNodes.put(importBlockNode, importBlock);
+                    delayImportsNode.add(importBlockNode);
                 }
             }
 
@@ -823,98 +834,22 @@ public class VisualPE {
 
                 } else if (path != null && path.getLastPathComponent() == importsNode) {
 
-                    JPanel importsPanel = new JPanel();
-
-                    importsPanel.setLayout(new GridBagLayout());
-
-                    GridBagByRowAdder importsRowAdder = new GridBagByRowAdder(col1, col2, col4);
-
-                    DirectoryEntry importDirectoryEntry = peFormat.getDirectoryEntry(PEFormat.IMPORTS_INDEX);
-                    Section correspondingSection = peFormat.findSectionByRVA(importDirectoryEntry.VirtualAddress);
-                    if (correspondingSection != null) {
-                        long offsetInSection = importDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
-                        long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
-
-                        importsRowAdder.addRow(importsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
-                        importsRowAdder.addRow(importsPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
-                        importsRowAdder.addRow(importsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
-                        importsRowAdder.addRow(importsPanel, new JLabel("Size: "), new JLabel(String.valueOf(importDirectoryEntry.Size)), makeFiller());
-
-                        importsRowAdder.addSingleComponentWholeRow(importsPanel, new JSeparator(), new Insets(5, 5, 5, 5));
-
-                        DefaultTableModel importsTableModel = new DefaultTableModel();
-                        importsTableModel.setColumnIdentifiers(new String[]{"Name RVA", "Name section+offset", "Name", "Import lookup table RVA", "Import lookup table section+offset", "Import address table RVA", "Import address table section+offset"});
-
-                        for (ImportBlock importEntry : peFormat.imports) {
-                            ImportDirectoryTableEntry importTableEntry = importEntry.importTableEntry;
-                            importsTableModel.addRow(new String[]{
-                                    String.valueOf(importTableEntry.nameRva),
-                                    peFormat.findSectionByRVA(importTableEntry.nameRva).resolvedName + "+" + String.valueOf(importTableEntry.nameRva - peFormat.findSectionByRVA(importTableEntry.nameRva).sectionHeader.virtualAddress),
-                                    importEntry.name,
-                                    String.valueOf(importTableEntry.importLookupTableRva),
-                                    peFormat.findSectionByRVA(importTableEntry.importLookupTableRva).resolvedName + "+" + String.valueOf(importTableEntry.importLookupTableRva - peFormat.findSectionByRVA(importTableEntry.importLookupTableRva).sectionHeader.virtualAddress),
-                                    String.valueOf(importTableEntry.importAddressTableRva),
-                                    peFormat.findSectionByRVA(importTableEntry.importAddressTableRva).resolvedName + "+" + String.valueOf(importTableEntry.importAddressTableRva - peFormat.findSectionByRVA(importTableEntry.importAddressTableRva).sectionHeader.virtualAddress),
-                            });
-                        }
-
-                        JTable importsTable = new JTable(importsTableModel);
-
-                        JScrollPane importsTableScrollPane = new JScrollPane(importsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
-                        importsTable.setFillsViewportHeight(true);
-
-                        importsRowAdder.addSingleComponentWholeRow(importsPanel, importsTableScrollPane, new Insets(5, 5, 5, 5));
-
-                        importsRowAdder.addBottomFillerTo(importsPanel);
-
-                        importsPanel.setBackground(UIManager.getColor("List.background"));
-                        importsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                    }
-
+                    JPanel importsPanel = populateImportsContent(peFormat, PEFormat.IMPORTS_INDEX, peFormat.imports);
                     contentScrollPane.setViewportView(importsPanel);
 
                 } else if (path != null && importBlockNodes.containsKey(path.getLastPathComponent())) {
-                    ImportBlock importBlock = importBlockNodes.get(path.getLastPathComponent());
 
-                    JPanel importBlockPanel = new JPanel();
+                    JPanel importBlockPanel = populateImportBlockContent(peFormat, importBlockNodes.get(path.getLastPathComponent()));
+                    contentScrollPane.setViewportView(importBlockPanel);
 
-                    importBlockPanel.setLayout(new GridBagLayout());
+                } else if (path != null && path.getLastPathComponent() == delayImportsNode) {
 
-                    GridBagByRowAdder importFunctionsRowAdder = new GridBagByRowAdder(col1, col2, col4);
+                    JPanel importsPanel = populateImportsContent(peFormat, PEFormat.DELAY_IMPORTS_INDEX, peFormat.delayImports);
+                    contentScrollPane.setViewportView(importsPanel);
 
-                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Name: "), new JLabel(importBlock.name), makeFiller());
-                    ImportDirectoryTableEntry importTableEntry = importBlock.importTableEntry;
-                    Section lookupTableSection = peFormat.findSectionByRVA(importTableEntry.importLookupTableRva);
-                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table section + offset: "), new JLabel(lookupTableSection.resolvedName + "+" + String.valueOf(importTableEntry.importLookupTableRva - lookupTableSection.sectionHeader.virtualAddress)), makeFiller());
-                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table num entries: "), new JLabel(String.valueOf(importBlock.numEntries())), makeFiller());
-                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table size: "), new JLabel(String.valueOf(importBlock.sizeInBytes())), makeFiller());
-                    Section addressTableSection = peFormat.findSectionByRVA(importTableEntry.importAddressTableRva);
-                    importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import address table section + offset: "), new JLabel(addressTableSection.resolvedName + "+" + String.valueOf(importTableEntry.importAddressTableRva - addressTableSection.sectionHeader.virtualAddress)), makeFiller());
+                } else if (path != null && delayImportBlockNodes.containsKey(path.getLastPathComponent())) {
 
-                    DefaultTableModel importedFunctionsTableModel = new DefaultTableModel();
-                    importedFunctionsTableModel.setColumnIdentifiers(new String[]{"Name"});
-
-                    // TODO replace this with detailed data with ordinal/name indicator
-                    List<String> importedFunctions = importBlock.resolvedImportedFunctions;
-                    for (String importedFunction : importedFunctions) {
-                        importedFunctionsTableModel.addRow(new String[]{
-                                importedFunction
-                        });
-                    }
-
-                    JTable importedFunctionsTable = new JTable(importedFunctionsTableModel);
-
-                    JScrollPane importedFunctionsTableScrollPane = new JScrollPane(importedFunctionsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
-                    importedFunctionsTable.setFillsViewportHeight(true);
-
-                    importFunctionsRowAdder.addSingleComponentWholeRow(importBlockPanel, importedFunctionsTableScrollPane, new Insets(5, 5, 5, 5));
-
-                    importFunctionsRowAdder.addBottomFillerTo(importBlockPanel);
-
-                    importBlockPanel.setBackground(UIManager.getColor("List.background"));
-                    importBlockPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
-
+                    JPanel importBlockPanel = populateImportBlockContent(peFormat, delayImportBlockNodes.get(path.getLastPathComponent()));
                     contentScrollPane.setViewportView(importBlockPanel);
 
                 } else if (path != null && path.getLastPathComponent() == relocationsNode) {
@@ -1054,6 +989,100 @@ public class VisualPE {
 
         });
 
+    }
+
+    private JPanel populateImportBlockContent(PEFormat peFormat, ImportBlock importBlock) {
+
+        JPanel importBlockPanel = new JPanel();
+
+        importBlockPanel.setLayout(new GridBagLayout());
+
+        GridBagByRowAdder importFunctionsRowAdder = new GridBagByRowAdder(col1, col2, col4);
+
+        importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Name: "), new JLabel(importBlock.name), makeFiller());
+        Section lookupTableSection = peFormat.findSectionByRVA(importBlock.getImportLookupTableRva());
+        importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table section + offset: "), new JLabel(lookupTableSection.resolvedName + "+" + String.valueOf(importBlock.getImportLookupTableRva() - lookupTableSection.sectionHeader.virtualAddress)), makeFiller());
+        importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table num entries: "), new JLabel(String.valueOf(importBlock.numEntries())), makeFiller());
+        importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import lookup table size: "), new JLabel(String.valueOf(importBlock.sizeInBytes())), makeFiller());
+        Section addressTableSection = peFormat.findSectionByRVA(importBlock.getImportAddressTableRva());
+        importFunctionsRowAdder.addRow(importBlockPanel, new JLabel("Import address table section + offset: "), new JLabel(addressTableSection.resolvedName + "+" + String.valueOf(importBlock.getImportAddressTableRva() - addressTableSection.sectionHeader.virtualAddress)), makeFiller());
+
+        DefaultTableModel importedFunctionsTableModel = new DefaultTableModel();
+        importedFunctionsTableModel.setColumnIdentifiers(new String[]{"Name"});
+
+        // TODO replace this with detailed data with ordinal/name indicator
+        List<String> importedFunctions = importBlock.resolvedImportedFunctions;
+        for (String importedFunction : importedFunctions) {
+            importedFunctionsTableModel.addRow(new String[]{
+                    importedFunction
+            });
+        }
+
+        JTable importedFunctionsTable = new JTable(importedFunctionsTableModel);
+
+        JScrollPane importedFunctionsTableScrollPane = new JScrollPane(importedFunctionsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+        importedFunctionsTable.setFillsViewportHeight(true);
+
+        importFunctionsRowAdder.addSingleComponentWholeRow(importBlockPanel, importedFunctionsTableScrollPane, new Insets(5, 5, 5, 5));
+
+        importFunctionsRowAdder.addBottomFillerTo(importBlockPanel);
+
+        importBlockPanel.setBackground(UIManager.getColor("List.background"));
+        importBlockPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        return importBlockPanel;
+    }
+
+    private JPanel populateImportsContent(PEFormat peFormat, int importsIndex, List<ImportBlock> imports) {
+        JPanel importsPanel = new JPanel();
+
+        importsPanel.setLayout(new GridBagLayout());
+
+        GridBagByRowAdder importsRowAdder = new GridBagByRowAdder(col1, col2, col4);
+
+        DirectoryEntry importDirectoryEntry = peFormat.getDirectoryEntry(importsIndex);
+        Section correspondingSection = peFormat.findSectionByRVA(importDirectoryEntry.VirtualAddress);
+        if (correspondingSection != null) {
+            long offsetInSection = importDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
+            long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
+
+            importsRowAdder.addRow(importsPanel, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
+            importsRowAdder.addRow(importsPanel, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
+            importsRowAdder.addRow(importsPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
+            importsRowAdder.addRow(importsPanel, new JLabel("Size: "), new JLabel(String.valueOf(importDirectoryEntry.Size)), makeFiller());
+
+            importsRowAdder.addSingleComponentWholeRow(importsPanel, new JSeparator(), new Insets(5, 5, 5, 5));
+
+            DefaultTableModel importsTableModel = new DefaultTableModel();
+            importsTableModel.setColumnIdentifiers(new String[]{"Name RVA", "Name section+offset", "Name", "Import lookup table RVA", "Import lookup table section+offset", "Import address table RVA", "Import address table section+offset"});
+
+            for (ImportBlock importEntry : imports) {
+                long nameRva = importEntry.getNameRva();
+                long importLookupTableRva = importEntry.getImportLookupTableRva();
+                long importAddressTableRva = importEntry.getImportAddressTableRva();
+                importsTableModel.addRow(new String[]{
+                        String.valueOf(nameRva),
+                        peFormat.findSectionByRVA(nameRva).resolvedName + "+" + String.valueOf(nameRva - peFormat.findSectionByRVA(nameRva).sectionHeader.virtualAddress),
+                        importEntry.name,
+                        String.valueOf(importLookupTableRva),
+                        peFormat.findSectionByRVA(importLookupTableRva).resolvedName + "+" + String.valueOf(importLookupTableRva - peFormat.findSectionByRVA(importLookupTableRva).sectionHeader.virtualAddress),
+                        String.valueOf(importAddressTableRva),
+                        peFormat.findSectionByRVA(importAddressTableRva).resolvedName + "+" + String.valueOf(importAddressTableRva - peFormat.findSectionByRVA(importAddressTableRva).sectionHeader.virtualAddress),
+                });
+            }
+
+            JTable importsTable = new JTable(importsTableModel);
+
+            JScrollPane importsTableScrollPane = new JScrollPane(importsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+            importsTable.setFillsViewportHeight(true);
+
+            importsRowAdder.addSingleComponentWholeRow(importsPanel, importsTableScrollPane, new Insets(5, 5, 5, 5));
+
+            importsRowAdder.addBottomFillerTo(importsPanel);
+
+            importsPanel.setBackground(UIManager.getColor("List.background"));
+            importsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        }
+        return importsPanel;
     }
 
     private void showSectionInfo(Section section) {

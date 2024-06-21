@@ -21,7 +21,7 @@ public class ExInstruction extends Instruction {
 
     public void getCode(Operand op1, Operand op2) throws IncorrectOperandException {
         int code, prefix1 = -1;
-        if ((op1.type == Operand.Type.MEM_PTR_REG) && (op1.reg16 == REG_SP) && (op2.type == Operand.Type.REG16)) {
+        if ((op1.type == Operand.Type.MEM_PTR_REG16) && (op1.reg16 == REG_SP) && (op2.type == Operand.Type.REG16)) {
             if (op2.reg16 == REG_HL) {
                 code = 0xE3;
             } else if (op2.reg16 == REG_IX) {

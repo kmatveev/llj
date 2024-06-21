@@ -36,9 +36,6 @@ public class TestDecodeEncode {
         LdInstruction ldDecoded = LdInstruction.decodeInitial(code, prefix);
         if (ldDecoded != null) {
             LdInstruction result = new LdInstruction(ldDecoded.opDest, ldDecoded.opSrc);
-            if (result.tstates != ldDecoded.tstates) {
-                throw new RuntimeException();
-            }
             return result;
         }
 

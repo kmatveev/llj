@@ -52,7 +52,7 @@ public class IncDecInstruction extends Instruction {
             } else {
                 throw new RuntimeException();
             }
-        } else if ((op.type == Operand.Type.REG8) || (op.type == Operand.Type.MEM_PTR_REG)) {
+        } else if ((op.type == Operand.Type.REG8) || (op.type == Operand.Type.MEM_PTR_REG16)) {
 
             if (op.reg8 == Operand.Reg8.REG_B) {
                 code = 0x04;
@@ -243,7 +243,7 @@ public class IncDecInstruction extends Instruction {
 
     @Override
     public int decodeRemaining(byte[] data, int offset) {
-        if (op.type == Operand.Type.MEM_PTR_REG) {
+        if (op.type == Operand.Type.MEM_PTR_REG16) {
             if ((op.reg16 == Operand.Reg16.REG_IX) || (op.reg16 == Operand.Reg16.REG_IY)) {
                 data[offset] = (byte)op.indexOffset;
                 offset++;

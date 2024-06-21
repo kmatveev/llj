@@ -89,6 +89,12 @@ public class Section implements Format {
             throw new IllegalArgumentException();
         }
     }
+
+    public ByteBuffer getByVirtualAddress(long virtualAddress, long size) {
+        ByteBuffer bb = getByVirtualAddress(virtualAddress);
+        bb.limit((int) (bb.position() + size));
+        return bb;
+    }
     
     public String getStringByVirtualAddress(long virtualAddress) {
         return BinTools.readZeroTerminatedAsciiString(getByVirtualAddress(virtualAddress));

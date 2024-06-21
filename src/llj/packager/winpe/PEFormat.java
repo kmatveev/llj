@@ -19,7 +19,7 @@ import static llj.util.BinIOTools.*;
 public class PEFormat extends COFFBasedFormat<PEFormatException> implements Format {
 
     public static final String[] DIRECTORY_ENTRY_NAMES = new String[]{"Export table", "Import table", "Resource table", "Exception table", "Certificate table", "Base relocation table", "Debug", "Architecture", "Global ptr", "TLS table", "Load config table", "Bound import", "IAT", "Delay import descriptor", "CLR Runtime header", "Reserved"};
-    public static final int EXPORTS_INDEX = 0, IMPORTS_INDEX = 1, RESOURCES_INDEX = 2, RELOCS_INDEX = 5;
+    public static final int EXPORTS_INDEX = 0, IMPORTS_INDEX = 1, RESOURCES_INDEX = 2, RELOCS_INDEX = 5, DELAY_IMPORTS_INDEX = 13;
     public final ExtendedDOSHeader dosHeader = new ExtendedDOSHeader();
 
     public COFFOptionalHeaderStandard<Object> coffOptionalHeaderStandard = null;
@@ -27,7 +27,7 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
     public COFFOptionalHeaderPE32Plus coffOptionalHeaderPE32Plus = null;
     
     public ExportBlock exports;
-    public List<ImportBlock> imports;
+    public List<ImportBlock> imports, delayImports;
     public List<BaseRelocationsBlock> baseRelocations;
     public ResourceDirectory resourceRoot;
     
@@ -119,8 +119,8 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
             }
             if ((coffOptionalHeaderPE32.dataDirectory.size() > IMPORTS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(IMPORTS_INDEX).VirtualAddress > 0) {
                 imports = new ArrayList<>();
-                long importDirTableRva = coffOptionalHeaderPE32.dataDirectory.get(IMPORTS_INDEX).VirtualAddress;
-                readImportDirectoryTable(importDirTableRva, false);
+                DirectoryEntry directoryEntry = coffOptionalHeaderPE32.dataDirectory.get(IMPORTS_INDEX);
+                readImportDirectoryTable(directoryEntry.VirtualAddress, false, directoryEntry.Size);
             }
             if ((coffOptionalHeaderPE32.dataDirectory.size() > RESOURCES_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(RESOURCES_INDEX).VirtualAddress > 0) {
                 long resourceRootRva = coffOptionalHeaderPE32.dataDirectory.get(RESOURCES_INDEX).VirtualAddress;
@@ -130,7 +130,7 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
                 List<Section.Usage> usages = resourceRoot.resolve(bb, "/Root");
                 section.usages.addAll(usages);
             }
-            if ((coffOptionalHeaderPE32.dataDirectory.size() > RELOCS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(5).VirtualAddress > RELOCS_INDEX) {
+            if ((coffOptionalHeaderPE32.dataDirectory.size() > RELOCS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(RELOCS_INDEX).VirtualAddress > 0) {
                 long relocBlocksRva = coffOptionalHeaderPE32.dataDirectory.get(RELOCS_INDEX).VirtualAddress;
                 Section section = findSectionByRVA(relocBlocksRva);
                 ByteBuffer bb = section.getByVirtualAddress(relocBlocksRva);
@@ -138,6 +138,13 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
                 readBaseRelocations(bb, relocBlocksSize);
                 
             }
+            if ((coffOptionalHeaderPE32.dataDirectory.size() > DELAY_IMPORTS_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(DELAY_IMPORTS_INDEX).VirtualAddress > 0) {
+                delayImports = new ArrayList<>();
+                DirectoryEntry directoryEntry = coffOptionalHeaderPE32.dataDirectory.get(DELAY_IMPORTS_INDEX);
+                readDelayImportDirectoryTable(directoryEntry.VirtualAddress, true, directoryEntry.Size);
+            }
+
+
             
         } else if (coffOptionalHeaderPE32Plus != null) {
             if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > EXPORTS_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(EXPORTS_INDEX).VirtualAddress > 0) {
@@ -146,8 +153,8 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
             }
             if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > IMPORTS_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(IMPORTS_INDEX).VirtualAddress > 0) {
                 imports = new ArrayList<>();
-                long importDirTableRva = coffOptionalHeaderPE32Plus.dataDirectory.get(IMPORTS_INDEX).VirtualAddress;
-                readImportDirectoryTable(importDirTableRva, true);
+                DirectoryEntry directoryEntry = coffOptionalHeaderPE32Plus.dataDirectory.get(IMPORTS_INDEX);
+                readImportDirectoryTable(directoryEntry.VirtualAddress, true, directoryEntry.Size);
             }
             if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > RESOURCES_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(RESOURCES_INDEX).VirtualAddress > 0) {
                 long resourceRootRva = coffOptionalHeaderPE32Plus.dataDirectory.get(RESOURCES_INDEX).VirtualAddress;
@@ -164,6 +171,12 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
                 long relocBlocksSize = coffOptionalHeaderPE32Plus.dataDirectory.get(RELOCS_INDEX).Size;
                 readBaseRelocations(bb, relocBlocksSize);
             }
+            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > DELAY_IMPORTS_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(DELAY_IMPORTS_INDEX).VirtualAddress > 0) {
+                delayImports = new ArrayList<>();
+                DirectoryEntry directoryEntry = coffOptionalHeaderPE32Plus.dataDirectory.get(DELAY_IMPORTS_INDEX);
+                readDelayImportDirectoryTable(directoryEntry.VirtualAddress, true, directoryEntry.Size);
+            }
+
             
         }
 
@@ -267,9 +280,9 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
         section.addUsage(exportDirTableRva, size, "ExportDirectoryTable");
     }
 
-    public void readImportDirectoryTable(long importDirTableRva, boolean is64Bit) {
+    public void readImportDirectoryTable(long importDirTableRva, boolean is64Bit, long declaredSize) {
         Section section = findSectionByRVA(importDirTableRva);
-        ByteBuffer bb = section.getByVirtualAddress(importDirTableRva);
+        ByteBuffer bb = section.getByVirtualAddress(importDirTableRva, declaredSize);
         int count = 0;
         int size = 0;
         while (true) {
@@ -279,62 +292,36 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
             if (entry.allEmpty()) {
                 break;
             } else {
-                ImportBlock importBlock = new ImportBlock(entry, is64Bit);
+                ImportBlock importBlock = ImportBlock.createFrom(entry, is64Bit);
                 imports.add(importBlock);
-                Section importBlockSection = findSectionByRVA(entry.nameRva);
-                importBlock.name = importBlockSection.getStringByVirtualAddress(entry.nameRva);
-                importBlockSection.addUsage(entry.nameRva, importBlock.name.length() + 1, "ImportDirectoryTableEntry" + String.valueOf(count) + ".Name");
-                Section importLookupTableSection = findSectionByRVA(entry.importLookupTableRva);
-                ByteBuffer importLookupEntryRaw = importLookupTableSection.getByVirtualAddress(entry.importLookupTableRva);
-                Section importAddressTableSection = findSectionByRVA(entry.importAddressTableRva);
-                ByteBuffer importAddressEntryRaw = importAddressTableSection.getByVirtualAddress(entry.importAddressTableRva);
-                for (int i = 0; true; i++) {
-                    if (is64Bit) {
-                        ImportLookupEntryPE32Plus lookupEntry = new ImportLookupEntryPE32Plus(BinIOTools.getLong(importLookupEntryRaw));
-                        importLookupTableSection.addUsage(entry.importLookupTableRva + i * ImportLookupEntryPE32Plus.SIZE, ImportLookupEntryPE32Plus.SIZE, "ImportLookupEntryPE32Plus#" + i);
-                        ImportLookupEntryPE32Plus addressEntry = new ImportLookupEntryPE32Plus(BinIOTools.getLong(importAddressEntryRaw));
-                        importAddressTableSection.addUsage(entry.importAddressTableRva + i * ImportLookupEntryPE32Plus.SIZE, ImportLookupEntryPE32Plus.SIZE, "ImportAddressEntryPE32Plus#" + i);
-                        if (lookupEntry.isEmpty()) {
-                            break;
-                        } else {
-                            importBlock.importedFunctions64.add(lookupEntry);
-                            if (!lookupEntry.isOrdinal()) {
-                                Section hintNameSection = findSectionByRVA(lookupEntry.getHintNameRva());
-                                HintNameEntry hintNameEntry = HintNameEntry.readFrom(hintNameSection.getByVirtualAddress(lookupEntry.getHintNameRva()));
-                                hintNameSection.addUsage(lookupEntry.getHintNameRva(), hintNameEntry.getSize(), "HintNameEntry");
-                                String name = hintNameEntry.value;
-                                importBlock.resolvedImportedFunctions.add(name);
-                            } else {
-                                importBlock.resolvedImportedFunctions.add(String.valueOf(lookupEntry.getOrdinal()));
-                            }
-                        }
-                    } else {
-                        ImportLookupEntryPE32 lookupEntry = new ImportLookupEntryPE32(BinIOTools.getInt(importLookupEntryRaw));
-                        importLookupTableSection.addUsage(entry.importLookupTableRva + i * ImportLookupEntryPE32.SIZE, ImportLookupEntryPE32.SIZE, "ImportLookupEntryPE32#" + i);
-                        ImportLookupEntryPE32 addressEntry = new ImportLookupEntryPE32(BinIOTools.getInt(importAddressEntryRaw));
-                        importAddressTableSection.addUsage(entry.importAddressTableRva + i * ImportLookupEntryPE32.SIZE, ImportLookupEntryPE32.SIZE, "ImportAddressEntryPE32#" + i);
-                        if (lookupEntry.isEmpty()) {
-                            break;
-                        } else {
-                            importBlock.importedFunctions.add(lookupEntry);
-                            if (!lookupEntry.isOrdinal()) {
-                                Section hintNameSection = findSectionByRVA(lookupEntry.getHintNameRva());
-                                HintNameEntry hintNameEntry = HintNameEntry.readFrom(hintNameSection.getByVirtualAddress(lookupEntry.getHintNameRva()));
-                                hintNameSection.addUsage(lookupEntry.getHintNameRva(), hintNameEntry.getSize(), "HintNameEntry");
-                                String name = hintNameEntry.value;
-                                importBlock.resolvedImportedFunctions.add(name);
-                            } else {
-                                importBlock.resolvedImportedFunctions.add(String.valueOf(lookupEntry.getOrdinal()));
-                            }
-                        }
-                    }
-                }
-                
+                importBlock.processImportBlock(this, count);
             }
             count += 1;
         }
         section.addUsage(importDirTableRva, size, "ImportDirectoryTable");
     }
+
+    public void readDelayImportDirectoryTable(long importDirTableRva, boolean is64Bit, long declaredSize) {
+        Section section = findSectionByRVA(importDirTableRva);
+        ByteBuffer bb = section.getByVirtualAddress(importDirTableRva, declaredSize);
+        int count = 0;
+        int size = 0;
+        while (true) {
+            DelayImportDirectoryTableEntry entry = new DelayImportDirectoryTableEntry();
+            entry.readFrom(bb);
+            size += entry.getSize();
+            if (entry.allEmpty()) {
+                break;
+            } else {
+                ImportBlock importBlock = ImportBlock.createFrom(entry, is64Bit);
+                delayImports.add(importBlock);
+                importBlock.processImportBlock(this, count);
+            }
+            count += 1;
+        }
+        section.addUsage(importDirTableRva, size, "DelayImportDirectoryTable");
+    }
+
 
     public void readBaseRelocations(ByteBuffer bb, long size) {
         baseRelocations = new ArrayList<>();

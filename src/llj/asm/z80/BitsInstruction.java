@@ -61,7 +61,7 @@ public class BitsInstruction extends Instruction {
             } else {
                 throw new IncorrectOperandException();
             }
-        } else if (op.type == Operand.Type.MEM_PTR_REG) {
+        } else if (op.type == Operand.Type.MEM_PTR_REG16) {
             if (op.reg16 == Operand.Reg16.REG_HL) {
                 code += 6;
             } else if (op.reg16 == Operand.Reg16.REG_IX) {
@@ -155,7 +155,7 @@ public class BitsInstruction extends Instruction {
 
     @Override
     public int decodeRemaining(byte[] data, int offset) {
-        if (op.type == Operand.Type.MEM_PTR_REG) {
+        if (op.type == Operand.Type.MEM_PTR_REG16) {
             if ((op.reg16 == Operand.Reg16.REG_IX) || (op.reg16 == Operand.Reg16.REG_IY)) {
                 op.indexOffset = data[offset];
                 offset++;
@@ -167,7 +167,7 @@ public class BitsInstruction extends Instruction {
     @Override
     public int getSize() {
         int size = getOperationSize();
-        if (op.type == Operand.Type.MEM_PTR_REG) {
+        if (op.type == Operand.Type.MEM_PTR_REG16) {
             if ((op.reg16 == Operand.Reg16.REG_IX) || (op.reg16 == Operand.Reg16.REG_IY)) {
                 size++;
             }
@@ -178,7 +178,7 @@ public class BitsInstruction extends Instruction {
     @Override
     public int encode(byte[] dest, int offset) {
         offset = encodeOperation(dest, offset);
-        if (op.type == Operand.Type.MEM_PTR_REG) {
+        if (op.type == Operand.Type.MEM_PTR_REG16) {
             if ((op.reg16 == Operand.Reg16.REG_IX) || (op.reg16 == Operand.Reg16.REG_IY)) {
                 dest[offset] = (byte)op.indexOffset;
                 offset++;
