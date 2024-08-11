@@ -19,7 +19,7 @@ import static llj.util.BinIOTools.*;
 public class PEFormat extends COFFBasedFormat<PEFormatException> implements Format {
 
     public static final String[] DIRECTORY_ENTRY_NAMES = new String[]{"Export table", "Import table", "Resource table", "Exception table", "Certificate table", "Base relocation table", "Debug", "Architecture", "Global ptr", "TLS table", "Load config table", "Bound import", "IAT", "Delay import descriptor", "CLR Runtime header", "Reserved"};
-    public static final int EXPORTS_INDEX = 0, IMPORTS_INDEX = 1, RESOURCES_INDEX = 2, RELOCS_INDEX = 5, DELAY_IMPORTS_INDEX = 13;
+    public static final int EXPORTS_INDEX = 0, IMPORTS_INDEX = 1, RESOURCES_INDEX = 2, RELOCS_INDEX = 5, DEBUG_INDEX = 6, DELAY_IMPORTS_INDEX = 13;
     public final ExtendedDOSHeader dosHeader = new ExtendedDOSHeader();
 
     public COFFOptionalHeaderStandard<Object> coffOptionalHeaderStandard = null;
@@ -30,6 +30,7 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
     public List<ImportBlock> imports, delayImports;
     public List<BaseRelocationsBlock> baseRelocations;
     public ResourceDirectory resourceRoot;
+    public DebugDirectoryBlock debugDirectoryBlock;
     
     public final RawFormat dosStub = new RawFormat(null);
     public boolean peSignatureInPlace;
@@ -143,6 +144,14 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
                 DirectoryEntry directoryEntry = coffOptionalHeaderPE32.dataDirectory.get(DELAY_IMPORTS_INDEX);
                 readDelayImportDirectoryTable(directoryEntry.VirtualAddress, true, directoryEntry.Size);
             }
+            if ((coffOptionalHeaderPE32.dataDirectory.size() > DEBUG_INDEX) && coffOptionalHeaderPE32.dataDirectory.get(DEBUG_INDEX).VirtualAddress > 0) {
+                long debugBlockRva = coffOptionalHeaderPE32.dataDirectory.get(DEBUG_INDEX).VirtualAddress;
+                Section section = findSectionByRVA(debugBlockRva);
+                ByteBuffer bb = section.getByVirtualAddress(debugBlockRva);
+                long debugBlockSize = coffOptionalHeaderPE32.dataDirectory.get(DEBUG_INDEX).Size;
+                debugDirectoryBlock = new DebugDirectoryBlock();
+                debugDirectoryBlock.readFrom(bb, debugBlockSize);
+            }
 
 
             
@@ -175,6 +184,14 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
                 delayImports = new ArrayList<>();
                 DirectoryEntry directoryEntry = coffOptionalHeaderPE32Plus.dataDirectory.get(DELAY_IMPORTS_INDEX);
                 readDelayImportDirectoryTable(directoryEntry.VirtualAddress, true, directoryEntry.Size);
+            }
+            if ((coffOptionalHeaderPE32Plus.dataDirectory.size() > DEBUG_INDEX) && coffOptionalHeaderPE32Plus.dataDirectory.get(DEBUG_INDEX).VirtualAddress > 0) {
+                long debugBlockRva = coffOptionalHeaderPE32Plus.dataDirectory.get(DEBUG_INDEX).VirtualAddress;
+                Section section = findSectionByRVA(debugBlockRva);
+                ByteBuffer bb = section.getByVirtualAddress(debugBlockRva);
+                long debugBlockSize = coffOptionalHeaderPE32Plus.dataDirectory.get(DEBUG_INDEX).Size;
+                debugDirectoryBlock = new DebugDirectoryBlock();
+                debugDirectoryBlock.readFrom(bb, debugBlockSize);
             }
 
             
@@ -358,6 +375,28 @@ public class PEFormat extends COFFBasedFormat<PEFormatException> implements Form
             }
         }
         return null;
+    }
+
+    public List<Section> findSectionsByRVA(long rva) {
+        List<Section> result = new ArrayList<>();
+        for (Section section : sections) {
+            // in PE file sections contain RVA in field "Virtual address"
+            if (section.sectionHeader.containsVirtualAddress(rva)) {
+                result.add(section);
+            }
+        }
+        return result;
+    }
+
+    public List<Section> findSectionsByFilePosition(long filePosition) {
+        List<Section> result = new ArrayList<>();
+        for (Section section : sections) {
+            // in PE file sections contain RVA in field "Virtual address"
+            if (section.sectionHeader.containsFilePosition(filePosition)) {
+                result.add(section);
+            }
+        }
+        return result;
     }
 
     public long getImageBaseVA() {

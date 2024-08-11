@@ -365,7 +365,7 @@ public class VisualPE {
         IdentityHashMap<TreeNode, Section> sectionHeaderNodes;
         DefaultMutableTreeNode sectionsNode;
         IdentityHashMap<TreeNode, Section> sectionNodes;
-        DefaultMutableTreeNode exportsNode, importsNode, resourcesRootNode, exceptionsNode, delayImportsNode;
+        DefaultMutableTreeNode exportsNode, importsNode, resourcesRootNode, exceptionsNode, delayImportsNode, debugNode;
         DefaultMutableTreeNode coffSymbolsNode;
         DefaultMutableTreeNode coffStringsNode;
 
@@ -440,6 +440,18 @@ public class VisualPE {
                     delayImportsNode.add(importBlockNode);
                 }
             }
+
+        debugNode = new DefaultMutableTreeNode("Debug");
+        peNode.add(debugNode);
+        IdentityHashMap<DefaultMutableTreeNode, DebugDirectoryBlock.DebugDirectoryEntry> debugBlockNodes = new IdentityHashMap<>();
+        if (peFormat.debugDirectoryBlock != null) {
+            for (DebugDirectoryBlock.DebugDirectoryEntry debugEntry : peFormat.debugDirectoryBlock.entries) {
+                DefaultMutableTreeNode debugEntryNode = new DefaultMutableTreeNode(DebugDirectoryBlock.DebugDirectoryEntry.Field.Type.getStringValue(debugEntry, DisplayFormat.DEFAULT).orElse("Unsupported"));
+                debugBlockNodes.put(debugEntryNode, debugEntry);
+                debugNode.add(debugEntryNode);
+            }
+        }
+
 
             IdentityHashMap<DefaultMutableTreeNode, ResourceEntry> resourceNodes = new IdentityHashMap<>();
 
@@ -908,6 +920,108 @@ public class VisualPE {
                     }
 
                     contentScrollPane.setViewportView(relocationsBlockPanel);
+                } else if (path != null && path.getLastPathComponent() == debugNode) {
+
+                    JPanel debugInfo = new JPanel();
+
+                    debugInfo.setLayout(new GridBagLayout());
+
+                    GridBagByRowAdder debugInfoRowAdder = new GridBagByRowAdder(col1, col2, col4);
+
+                    DirectoryEntry debugDirectoryEntry = peFormat.getDirectoryEntry(PEFormat.DEBUG_INDEX );
+                    Section correspondingSection = peFormat.findSectionByRVA(debugDirectoryEntry.VirtualAddress);
+                    if (correspondingSection != null) {
+                        long offsetInSection = debugDirectoryEntry.VirtualAddress - correspondingSection.sectionHeader.virtualAddress;
+                        long offsetInFile = correspondingSection.sectionHeader.pointerToRawData + offsetInSection;
+
+                        debugInfoRowAdder.addRow(debugInfo, new JLabel("Corresponding section: "), new JLabel(correspondingSection.resolvedName), makeFiller());
+                        debugInfoRowAdder.addRow(debugInfo, new JLabel("Offset in section: "), new JLabel(getDecAndHexStr(offsetInSection)), makeFiller());
+                        debugInfoRowAdder.addRow(debugInfo, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(offsetInFile)), makeFiller());
+                        debugInfoRowAdder.addRow(debugInfo, new JLabel("Size: "), new JLabel(String.valueOf(debugDirectoryEntry.Size)), makeFiller());
+
+                        debugInfoRowAdder.addSingleComponentWholeRow(debugInfo, new JSeparator(), new Insets(5, 5, 5, 5));
+
+                        DefaultTableModel debugEntriesTableModel = new DefaultTableModel();
+                        debugEntriesTableModel.setColumnIdentifiers(new String[]{"Characteristics", "Type", "Size of data", "Address of raw data", "Pointer to raw data", "Corresponding section", "Calculated address"});
+
+                        for (int i = 0; i < peFormat.debugDirectoryBlock.entries.size(); i++) {
+                            DebugDirectoryBlock.DebugDirectoryEntry entry = peFormat.debugDirectoryBlock.entries.get(i);
+                            List<Section> sections = peFormat.findSectionsByFilePosition(entry.pointerToRawData);
+                            String sectionName, calculatedAddress;
+                            if (sections == null) {
+                                sectionName = "Not found";
+                                calculatedAddress = "";
+                            } else if (sections.size() == 1) {
+                                sectionName = sections.get(0).getName();
+                                calculatedAddress = getDecAndHexStr(sections.get(0).sectionHeader.filePositionToVA(entry.pointerToRawData));
+                            } else {
+                                sectionName = "Multiple (" + sections.size() + ")";
+                                calculatedAddress = "";
+                            }
+
+                            debugEntriesTableModel.addRow(new String[]{
+                                    String.valueOf(entry.characteristics),
+                                    DebugDirectoryBlock.DebugDirectoryEntry.Field.Type.getStringValue(entry, DisplayFormat.DEFAULT).orElse("Unsupported"),
+                                    getDecAndHexStr(entry.sizeOfData),
+                                    getDecAndHexStr(entry.addressOfRawData),
+                                    getDecAndHexStr(entry.pointerToRawData),
+                                    sectionName,
+                                    calculatedAddress
+                            });
+                        }
+
+                        JTable exportsTable = new JTable(debugEntriesTableModel);
+
+                        JScrollPane exportsTableScrollPane = new JScrollPane(exportsTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+                        exportsTable.setFillsViewportHeight(true);
+
+                        debugInfoRowAdder.addSingleComponentWholeRow(debugInfo, exportsTableScrollPane, new Insets(5, 5, 5, 5));
+
+                        debugInfoRowAdder.addBottomFillerTo(debugInfo);
+
+                        debugInfo.setBackground(UIManager.getColor("List.background"));
+                        debugInfo.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                    }
+
+                    contentScrollPane.setViewportView(debugInfo);
+
+                } else if (path != null && debugBlockNodes.containsKey(path.getLastPathComponent())) {
+
+                    JPanel debugEntryInfoPanel = new JPanel();
+
+                    debugEntryInfoPanel.setLayout(new GridBagLayout());
+
+                    GridBagByRowAdder debugEntryInfoAdder = new GridBagByRowAdder(col1, col2, col4);
+
+                    DebugDirectoryBlock.DebugDirectoryEntry entry = debugBlockNodes.get(path.getLastPathComponent());
+
+                    List<Section> sections = peFormat.findSectionsByFilePosition(entry.pointerToRawData);
+                    String sectionName, calculatedAddress;
+                    if (sections == null) {
+                        sectionName = "Not found";
+                        calculatedAddress = "";
+                    } else if (sections.size() == 1) {
+                        sectionName = sections.get(0).getName();
+                        calculatedAddress = getDecAndHexStr(sections.get(0).sectionHeader.filePositionToVA(entry.pointerToRawData));
+                    } else {
+                        sectionName = "Multiple (" + sections.size() + ")";
+                        calculatedAddress = "";
+                    }
+
+                    debugEntryInfoAdder.addRow(debugEntryInfoPanel, new JLabel("Characteristics: "), new JLabel(String.valueOf(entry.characteristics)), makeFiller());
+                    debugEntryInfoAdder.addRow(debugEntryInfoPanel, new JLabel("Type: "), new JLabel(DebugDirectoryBlock.DebugDirectoryEntry.Field.Type.getStringValue(entry, DisplayFormat.DEFAULT).orElse("Unsupported")), makeFiller());
+                    debugEntryInfoAdder.addRow(debugEntryInfoPanel, new JLabel("RVA of raw data: "), new JLabel(getDecAndHexStr(entry.addressOfRawData)), makeFiller());
+                    debugEntryInfoAdder.addRow(debugEntryInfoPanel, new JLabel("Offset from start of file: "), new JLabel(getDecAndHexStr(entry.pointerToRawData)), makeFiller());
+                    debugEntryInfoAdder.addRow(debugEntryInfoPanel, new JLabel("Size of data: "), new JLabel(String.valueOf(entry.sizeOfData)), makeFiller());
+                    debugEntryInfoAdder.addRow(debugEntryInfoPanel, new JLabel("Corresponding section: "), new JLabel(sectionName), makeFiller());
+                    debugEntryInfoAdder.addRow(debugEntryInfoPanel, new JLabel("Calculated address: "), new JLabel(calculatedAddress), makeFiller());
+
+                    debugEntryInfoAdder.addBottomFillerTo(debugEntryInfoPanel);
+
+                    debugEntryInfoPanel.setBackground(UIManager.getColor("List.background"));
+                    debugEntryInfoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+                    contentScrollPane.setViewportView(debugEntryInfoPanel);
 
 
                 } else if (path != null && path.getLastPathComponent() == sectionsNode) {

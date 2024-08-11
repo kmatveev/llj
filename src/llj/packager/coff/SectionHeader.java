@@ -349,4 +349,13 @@ public class SectionHeader extends FieldSequenceFormat {
     public boolean containsVirtualAddress(long virtualAddress) {
         return ((virtualAddress >= this.virtualAddress) && (virtualAddress < this.virtualAddress + this.physicalAddressOrVirtualSize));
     }
+
+    public boolean containsFilePosition(long filePosition) {
+        return ((filePosition >= this.pointerToRawData) && (filePosition < this.pointerToRawData + this.sizeOfRawData));
+    }
+
+    public long filePositionToVA(long filePosition) {
+        return (filePosition - this.pointerToRawData) + this.virtualAddress;
+    }
+
 }
