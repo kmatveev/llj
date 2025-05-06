@@ -301,7 +301,7 @@ public class SectionHeader extends FieldSequenceFormat {
 
     }
 
-    public final NameOrStringTablePointer name = new NameOrStringTablePointer();
+    public final SectionNameOrStringTablePointer name = new SectionNameOrStringTablePointer();
     public long physicalAddressOrVirtualSize;
     public long virtualAddress;
     public long sizeOfRawData;

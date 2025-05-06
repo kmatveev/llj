@@ -93,7 +93,7 @@ public class SymbolTableEntry {
 
     }
 
-    public final NameOrStringTablePointer name = new NameOrStringTablePointer();
+    public final SymbolNameOrStringTablePointer name = new SymbolNameOrStringTablePointer();
 
     public long value;
     public int sectionNumber;

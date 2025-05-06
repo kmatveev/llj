@@ -392,7 +392,7 @@ public class VisualPE {
                 if (name.type == NameOrStringTablePointer.Type.NAME) {
                     nameText = new String(name.name);
                 } else {
-                    nameText = "StringTablePointer:" + name.stringTablePointer;
+                    nameText = peFormat.coffStrings.get((int) name.stringTablePointer).value;
                 }
                 DefaultMutableTreeNode sectionNode = new DefaultMutableTreeNode(nameText);
                 sectionHeaderNodes.put(sectionNode, section);
@@ -409,7 +409,7 @@ public class VisualPE {
                 if (name.type == NameOrStringTablePointer.Type.NAME) {
                     nameText = new String(name.name);
                 } else {
-                    nameText = "StringTablePointer:" + name.stringTablePointer;
+                    nameText = peFormat.coffStrings.get((int) name.stringTablePointer).value;
                 }
                 DefaultMutableTreeNode sectionNode = new DefaultMutableTreeNode(nameText);
                 sectionNodes.put(sectionNode, section);
