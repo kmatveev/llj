@@ -89,7 +89,9 @@ public class InvokeInstruction extends Instruction {
                 } catch (EmptyStackException e) {
                     throw new IncompatibleStackEffectException("OpStack Underflow", e);
                 }
-                if (!t.isAssignableFrom(valueType)) throw new IncompatibleVariableException();
+                if (!t.isAssignableFrom(valueType)) {
+                    throw new IncompatibleVariableException();
+                }
             }
             if (!RefType.instanceRef(methodRef.classRef).isAssignableFrom(opStack.content.pop())) throw new IncompatibleVariableException();
             Type returnType = methodRef.expectedReturnType;

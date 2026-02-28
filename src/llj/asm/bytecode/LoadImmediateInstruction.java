@@ -35,9 +35,9 @@ public class LoadImmediateInstruction extends Instruction {
             case dconst_1:
                 type = TypeType.DOUBLE; break;
             case bipush:
-                type = TypeType.INT; break;
+                type = TypeType.BYTE; break;
             case sipush:
-                type = TypeType.INT; break;
+                type = TypeType.SHORT; break;
             default:
                 throw new IllegalArgumentException("Wrong instruction code:" + code);
         }

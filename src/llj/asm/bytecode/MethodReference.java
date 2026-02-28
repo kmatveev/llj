@@ -78,7 +78,20 @@ public class MethodReference extends ClassMemberReference<MethodData> {
         if (classCache.resolveAndCache(classRef)) {
             ClassData classData = classRef.get();
             // even if ref params will not be resolved, we will be able to find method by param refs
-            method = classData.getMethod(methodName, paramTypes);
+            // search for method from referenced class up through all superclasses
+            while (classData != null) {
+                method = classData.getMethod(methodName, paramTypes);
+                if (method != null) break;
+                if (classData.parent != null) {
+                    if (classCache.resolveAndCache(classData.parent)) {
+                        classData = classData.parent.get(); // and continue on next iteration of loop
+                    } else {
+                        return false;
+                    }
+                } else {
+                    break;
+                }
+            }
             if (method == null) {
                 throw new LinkException("Cannot resolve method. Class " + classData.toString() + " doesn't contain a method with name " + methodName + " and type signature ... ");
             }

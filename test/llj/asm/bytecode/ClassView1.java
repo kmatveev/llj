@@ -4,12 +4,14 @@ import llj.packager.jclass.ClassFileFormat;
 import llj.packager.jclass.FormatException;
 import llj.util.ReadException;
 import llj.util.ref.MapResolver;
+import llj.util.swing.GridBagByRowAdder;
 import llj.util.swing.ZipFilesystemView;
 
 import javax.swing.AbstractAction;
 import javax.swing.AbstractListModel;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
+import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -26,6 +28,7 @@ import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
 import javax.swing.ListModel;
+import javax.swing.LookAndFeel;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
@@ -56,7 +59,9 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.Channels;
@@ -67,6 +72,7 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -83,6 +89,9 @@ public class ClassView1 {
     private final JFrame window;
 
     private final List<ClassData> classes = new ArrayList<ClassData>();
+    private final JTextField classNameField;
+    private final DefaultListModel<String> parentsListModel;
+    private final DefaultListModel<String> interfacesListModel;
     MapResolver<ClassData, String> cache = new MapResolver<ClassData, String>();
     private MethodData currentMethod;
     private final IdentityHashMap<MethodData, MethodStaticInfo> staticInfos = new IdentityHashMap<MethodData, MethodStaticInfo>();
@@ -201,6 +210,10 @@ public class ClassView1 {
 
 
         window.setJMenuBar(menuBar);
+        final JSplitPane methodInfoParent = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        // LookAndFeel.uninstallBorder(methodInfoParent);
+        final JComponent emptyRightPanel = new JPanel();
+        final JPanel classInfoPanel = new JPanel();
 
         {
             JPanel contentPane = new JPanel();
@@ -208,6 +221,7 @@ public class ClassView1 {
             contentPane.setLayout(new BorderLayout());
 
             JSplitPane split2 = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+            split2.setResizeWeight(0.5);
             contentPane.add(split2, BorderLayout.CENTER);
 
                 {
@@ -233,8 +247,13 @@ public class ClassView1 {
                                 ClassData classData = (ClassData) path.getPathComponent(2);
                                 MethodData methodData = getMethodBySignature(classData, (String) path.getPathComponent(3));
                                 methodSelected(methodData);
+                                setRightComponent(split2, methodInfoParent);
+                            } else if (path.getPathCount() == 3) {
+                                ClassData classData = (ClassData) path.getPathComponent(2);
+                                classSelected(classData);
+                                setRightComponent(split2, classInfoPanel);
                             } else {
-                                // ClassData classData = path.getPathComponent(1);
+                                setRightComponent(split2, emptyRightPanel);
                             }
                         }
                     });
@@ -280,6 +299,19 @@ public class ClassView1 {
                                                     }
 
 
+                                                } else if (classPath.isDirectory()) {
+                                                    JFileChooser classChooser = new JFileChooser(classPath);
+                                                    classChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                                                    int result = classChooser.showOpenDialog(window);
+                                                    if (result == JFileChooser.APPROVE_OPTION) {
+                                                        File selected = classChooser.getSelectedFile();
+                                                        InputStream classInputStream = new BufferedInputStream(new FileInputStream(selected));
+                                                        ClassData classData = addClass(classInputStream);
+                                                        List<ClassData> classList = classPathClasses.computeIfAbsent(classPath, x -> new ArrayList<ClassData>());
+                                                        classList.add(classData);
+                                                        classMembersTreeModel.classAdded(classPath, classes.size() - 1);
+                                                    }
+
                                                 }
                                             } catch (Exception exc) {
                                                 exc.printStackTrace();
@@ -300,7 +332,10 @@ public class ClassView1 {
 
                 }
 
-
+            {
+                emptyRightPanel.setPreferredSize(new Dimension(400, 400));
+                setRightComponent(split2, emptyRightPanel);
+            }
 
             codePopupMenu.add(new AbstractAction("Info") {
                 @Override
@@ -405,16 +440,91 @@ public class ClassView1 {
                 });
 
             }
-            
+
+            {
+                classInfoPanel.setLayout(new GridBagLayout());
+
+                Insets defaultInsets = new Insets(2, 5, 2, 5);
+
+                GridBagConstraints col1 = new GridBagConstraints();
+                col1.fill = GridBagConstraints.NONE;
+                col1.anchor = GridBagConstraints.NORTHEAST;
+                col1.insets = defaultInsets;
+                col1.weightx = 0;
+                col1.weighty = 0;
+
+                GridBagConstraints col2 = new GridBagConstraints();
+                col2.fill = GridBagConstraints.HORIZONTAL;
+                col2.anchor = GridBagConstraints.NORTHWEST;
+                col2.insets = defaultInsets;
+                col2.weightx = 0;
+                col2.weighty = 0;
+
+                GridBagByRowAdder adder = new GridBagByRowAdder(col1, col2); // this will assign gridx to params
+
+                classNameField = new JTextField(10);
+                classNameField.setEditable(false);
+                classNameField.setMaximumSize(classNameField.getPreferredSize());
+                adder.addRow(classInfoPanel, new JLabel("Class name:"), classNameField);
+
+                {
+                    parentsListModel = new DefaultListModel<>();
+                    parentsListModel.addAll(Arrays.asList(new String[]{"AAA", "BBB", "CCC", "DDD", "DEDE", "EEEE", "OPOP", "KIKI"}));
+                    JList<String> parentsList = new JList<>(parentsListModel);
+                    parentsList.setVisibleRowCount(5);
+                    JScrollPane parentsListScrollPane = new JScrollPane(parentsList, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+                    Dimension preferredSize = parentsListScrollPane.getPreferredSize();
+                    preferredSize.width = 100;
+                    parentsListScrollPane.setMaximumSize(preferredSize);
+                    parentsListScrollPane.setMinimumSize(preferredSize);
+
+                    col1.gridy = 1;
+                    classInfoPanel.add(new JLabel("Parents:"), col1);
+                    col2.gridy = 1;
+                    col2.weighty = 0;
+                    classInfoPanel.add(parentsListScrollPane, col2);
+                }
+
+                {
+                    interfacesListModel = new DefaultListModel<>();
+                    interfacesListModel.addAll(Arrays.asList(new String[]{"AAA", "BBB", "CCC", "DDD", "DEDE", "EEEE", "OPOP", "KIKI"}));
+                    JList<String> interfacesList = new JList<>(interfacesListModel);
+                    interfacesList.setVisibleRowCount(5);
+                    JScrollPane interfacesListScrollPane = new JScrollPane(interfacesList, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+                    Dimension preferredSize = interfacesListScrollPane.getPreferredSize();
+                    preferredSize.width = 100;
+                    interfacesListScrollPane.setMaximumSize(preferredSize);
+                    interfacesListScrollPane.setMinimumSize(preferredSize);
+
+                    col1.gridy = 2;
+                    classInfoPanel.add(new JLabel("Interfaces:"), col1);
+                    col2.gridy = 2;
+                    col2.weighty = 0;
+                    classInfoPanel.add(interfacesListScrollPane, col2);
+                }
+
+                {
+                    GridBagConstraints fillerGBC = new GridBagConstraints();
+                    fillerGBC.gridx = 0;
+                    fillerGBC.gridy = 3;
+                    fillerGBC.gridwidth = 2;
+                    fillerGBC.gridheight = 1;
+                    fillerGBC.fill = GridBagConstraints.BOTH;
+                    fillerGBC.anchor = GridBagConstraints.NORTHWEST;
+                    fillerGBC.weightx = 1.0;
+                    fillerGBC.weighty = 1.0;
+                    JComponent fillerPanel = new JPanel();
+                    fillerPanel.setOpaque(false);
+                    classInfoPanel.add(fillerPanel, fillerGBC);
+                }
+
+            }
 
             {
 
-                JSplitPane split3 = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-                split2.setRightComponent(split3);
-                
                 JPanel comp = new JPanel();
                 comp.setLayout(new BorderLayout());
-                split3.setTopComponent(comp);
+                methodInfoParent.setTopComponent(comp);
 
                 comp.add(methodData, BorderLayout.NORTH);
 
@@ -435,9 +545,7 @@ public class ClassView1 {
                 }
                 
                 JTabbedPane infoTabs = new JTabbedPane(JTabbedPane.BOTTOM);
-                split3.setBottomComponent(infoTabs);
-
-                infoTabs.addTab("Class info", new JPanel());
+                methodInfoParent.setBottomComponent(infoTabs);
 
                 infoTabs.addTab("Method info", new JPanel());
 
@@ -446,6 +554,7 @@ public class ClassView1 {
                 infoTabs.addTab("Local variables", new JPanel());
 
                 JPanel stackEffect = new JPanel(new GridBagLayout());
+                stackEffect.setOpaque(false);
                 infoTabs.addTab("Stack effect", stackEffect);
 
                 {
@@ -496,8 +605,12 @@ public class ClassView1 {
                     stackEffect.add(scrollPane, new GridBagConstraints(1, 1, 1, 1, 0.0, 1.0, GridBagConstraints.CENTER, GridBagConstraints.VERTICAL, new Insets(5,10,10,10), 0, 0));
                 }
 
-                stackEffect.add(new JPanel(), new GridBagConstraints(2, 0, 1, 1, 1.0, 0.0, GridBagConstraints.CENTER, GridBagConstraints.VERTICAL, new Insets(0,0,0,0), 0, 0));
-                stackEffect.add(new JPanel(), new GridBagConstraints(2, 1, 1, 1, 1.0, 0.0, GridBagConstraints.CENTER, GridBagConstraints.VERTICAL, new Insets(0,0,0,0), 0, 0));
+                JComponent c1 = new JPanel();
+                c1.setOpaque(false);
+                stackEffect.add(c1, new GridBagConstraints(2, 0, 1, 1, 1.0, 0.0, GridBagConstraints.CENTER, GridBagConstraints.VERTICAL, new Insets(0,0,0,0), 0, 0));
+                JComponent c2 = new JPanel();
+                c2.setOpaque(false);
+                stackEffect.add(c2, new GridBagConstraints(2, 1, 1, 1, 1.0, 0.0, GridBagConstraints.CENTER, GridBagConstraints.VERTICAL, new Insets(0,0,0,0), 0, 0));
                 
 
 //                {
@@ -546,6 +659,43 @@ public class ClassView1 {
         window.pack();
 
         window.setVisible(true);
+
+    }
+
+    private static void setRightComponent(JSplitPane splitPane, JComponent rightComp) {
+        if (splitPane.getRightComponent() != rightComp) {
+            int dividerLocation = splitPane.getDividerLocation();
+            splitPane.setRightComponent(rightComp);
+            splitPane.setDividerLocation(dividerLocation);
+        }
+    }
+
+    private void classSelected(ClassData classData) {
+        classNameField.setText(classData.name);
+
+        List<String> parentsUpward = new ArrayList<>();
+        ClassReference pref = classData.parent;
+        while(true) {
+            parentsUpward.add(pref.id);
+            if (pref.isResolved()) {
+                pref = pref.get().parent;
+                if (pref == null) {
+                    break;
+                }
+            } else {
+                parentsUpward.add("...");
+                break;
+            }
+        }
+        parentsListModel.clear();
+        parentsListModel.addAll(parentsUpward);
+
+        List<String> interfaces = new ArrayList<>();
+        for (ClassReference ifref : classData.implementedInterfaces) {
+            interfaces.add(ifref.id);
+        }
+        interfacesListModel.clear();
+        interfacesListModel.addAll(interfaces);
 
     }
 
@@ -943,7 +1093,7 @@ public class ClassView1 {
 
         private final EventListenerList eventListenerList = new EventListenerList();
 
-        public static final String ROOT = "Root";
+        public static final String ROOT = "Classpath";
 
         @Override
         public Object getRoot() {

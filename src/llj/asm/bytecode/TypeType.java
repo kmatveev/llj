@@ -48,8 +48,16 @@ public enum TypeType {
 
     public boolean isAssignableFrom(TypeType type) {
         switch (this) {
+            case LONG:
+                return type == LONG || type == INT || type == SHORT || type == CHAR || type == BYTE || type == BOOLEAN;
             case INT:
-                return type == INT || type == SHORT || type == CHAR || type == BOOLEAN;
+                return type == INT || type == SHORT || type == CHAR || type == BYTE || type == BOOLEAN;
+            case SHORT:
+                return type == SHORT || type == CHAR || type == BYTE;
+            case CHAR:
+                return type == CHAR || type == BYTE;
+            case DOUBLE:
+                return type == DOUBLE || type == FLOAT;
             case REF:
                 return type == REF || type == ARRAY_REF;
             default:

@@ -210,7 +210,8 @@ public abstract class Instruction {
                 if (cnst.getType() != Constant.ConstType.INTEGER
                         && cnst.getType() != Constant.ConstType.FLOAT
                         && cnst.getType() != Constant.ConstType.STRING_REF
-                        && cnst.getType() != Constant.ConstType.CLASS_REF)
+                        && cnst.getType() != Constant.ConstType.CLASS_REF
+                        && cnst.getType() != Constant.ConstType.METHOD_HANDLE)
                     throw new FormatException("Integer, Float, StringRef or ClassRefconst expected, but was:" + cnst.getType());
                 ConstantData constantData = ConstantData.get(cnst);
                 instr = new LoadConstInstruction(instrCode, constantData);
